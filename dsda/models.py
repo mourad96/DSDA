@@ -81,19 +81,41 @@ class GisNode:
 
 
 class AnchorType(str, Enum):
-    """Source classification of the spatial anchor k_prev."""
+    """Source classification of a spatial reference point.
+
+    PK_POST is the only anchor used for proximity decay (primary LRS-anchored
+    mode, Algorithm 1). MUNICIPALITY_CENTROID and PRIOR_EVENT are sector
+    references, used only to resolve an omitted or ambiguous PK marker.
+    """
     COLD_START = "COLD_START"
+    PK_POST = "PK_POST"
     PRIOR_EVENT = "PRIOR_EVENT"
     MUNICIPALITY_CENTROID = "MUNICIPALITY_CENTROID"
 
 
+class ResolutionMode(str, Enum):
+    """Candidate generation mode of Algorithm 1 (step 2)."""
+    LRS_ANCHORED = "LRS_ANCHORED"        # PK marker resolved: anchor = k_PK, buffer R_max
+    SECTOR_FALLBACK = "SECTOR_FALLBACK"  # PK omitted/ambiguous: w2 = 0, sector query
+
+
 @dataclass(frozen=True)
 class Anchor:
-    """Spatial anchor point k_prev used for proximity decay."""
+    """Spatial reference point (k_PK, k_municipality or k_prev)."""
     coords: Point2D
     anchor_type: AnchorType
     source_id: Optional[str] = None
     timestamp: Optional[datetime] = None
+    route: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class PKPost:
+    """Nominal kilometric post (k_PK) on a route centerline."""
+    route: str
+    pk_marker: str
+    coords: Point2D
+    sector: Optional[str] = None
 
 
 @dataclass
@@ -101,12 +123,14 @@ class CrashEvent:
     """A crash event requiring linear referencing disambiguation."""
     event_id: str
     route: str
-    pk_marker: str
+    pk_marker: Optional[str]
     narrative_landmarks: List[str]
     timestamp: Optional[datetime] = None
     municipality_centroid: Optional[Point2D] = None
-    ground_truth_coords: Optional[Point2D] = None
+    intersection_descriptors: bool = False
     extra: Dict[str, Any] = field(default_factory=dict)
+    # NOTE: ground-truth coordinates are deliberately NOT part of the runtime
+    # event. They are only used post hoc by dsda.evaluation (E_geo, P90, P95).
 
     def __post_init__(self) -> None:
         if isinstance(self.narrative_landmarks, str):
@@ -141,7 +165,8 @@ class GeocodingResult:
     candidate_evaluations: List[CandidateEvaluation]
     weights_used: Dict[str, float]
     anchor_used: Optional[Anchor]
-    e_geo: Optional[float] = None
+    mode: ResolutionMode = ResolutionMode.LRS_ANCHORED
+    sector_reference: Optional[Anchor] = None
     is_safe_anchor: bool = False
     decision_message: str = ""
 
@@ -150,7 +175,7 @@ class GeocodingResult:
         lines = [
             f"Event ID: {self.event_id} | Status: {self.status.value} (Score: {self.best_score:.3f})",
             f"Weights: {self.weights_used}",
-            f"Anchor: {self.anchor_used.anchor_type.value if self.anchor_used else 'None'}",
+            f"Mode: {self.mode.value} | Proximity anchor: {self.anchor_used.anchor_type.value if self.anchor_used else 'None'}",
             f"{'-'*75}",
             f"{'Node':<22} | {'Route':<7} | {'Dist(m)':<8} | {'Toponym':<7} | {'Prox':<6} | {'Topo':<5} | {'Cs'}",
             f"{'-'*75}"
@@ -182,13 +207,17 @@ class DSDAParameters:
     # Gaussian proximity bandwidth (Equation A3)
     sigma: float = 150.0
 
-    # Auto-validation threshold (Rule 3)
+    # Auto-validation threshold (acceptance gate, Algorithm 1 step 5)
     validation_threshold: float = 0.85
 
-    # Geocoding spatial tolerance in meters (Rule 3)
-    e_geo_tolerance: float = 50.0
+    # Candidate search buffer around the nominal PK post k_PK (Algorithm 1 step 2)
+    r_max: float = 500.0
 
-    # Tight temporal window for simultaneous events (Rule 2)
+    # Radius of the municipal sector queried in fallback mode (implementation
+    # choice: Algorithm 1 does not fix it numerically)
+    sector_radius: float = 5000.0
+
+    # Chronological sector rule: Delta_t <= 24 h -> k_municipality
     simultaneous_window: timedelta = timedelta(hours=24)
 
     def __post_init__(self) -> None:
@@ -202,5 +231,7 @@ class DSDAParameters:
             raise ValueError(f"Bandwidth sigma must be strictly positive, got {self.sigma}")
         if not (0.0 <= self.validation_threshold <= 1.0):
             raise ValueError(f"Validation threshold must be in [0, 1], got {self.validation_threshold}")
-        if self.e_geo_tolerance <= 0:
-            raise ValueError(f"e_geo_tolerance must be strictly positive, got {self.e_geo_tolerance}")
+        if self.r_max <= 0:
+            raise ValueError(f"r_max must be strictly positive, got {self.r_max}")
+        if self.sector_radius <= 0:
+            raise ValueError(f"sector_radius must be strictly positive, got {self.sector_radius}")

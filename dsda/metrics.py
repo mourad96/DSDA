@@ -68,11 +68,11 @@ def compute_proximity_similarity(
 ) -> Tuple[float, float]:
     """Compute ProximityMatch S_proximity (Equation A3).
 
-    S_proximity(l_k) = exp( - d(k, k_prev)^2 / (2 * sigma^2) )
+    S_proximity(l_k) = exp( - d(k, k_PK)^2 / (2 * sigma^2) )
 
     Args:
         candidate_coords: Spatial coordinates of candidate node k.
-        anchor_coords: Spatial coordinates of prior anchor k_prev (or None for Cold Start).
+        anchor_coords: Nominal PK post coordinate k_PK (None in fallback mode).
         sigma: Structural bandwidth in meters (default 150.0 m).
 
     Returns:
@@ -119,30 +119,32 @@ def compute_topology_similarity(
 def resolve_weights(
     is_cold_start: bool,
     params: DSDAParameters,
+    intersection: bool = False,
 ) -> Dict[str, float]:
-    """Determine multi-criteria weights based on Cold Start status (Rule 1).
+    """Determine multi-criteria weights (Algorithm 1, steps 2 and 4).
 
-    Under Cold Start, the S_proximity component is neutralized with w2 variance
-    absorbed by w1 (w1=0.875, w2=0.000, w3=0.125).
+    Base weights: standard (0.500, 0.375, 0.125) in LRS-anchored mode;
+    fallback / cold start (0.875, 0.000, 0.125) when no k_PK anchor exists,
+    i.e. S_proximity is neutralized and w2 is absorbed by w1.
+
+    Adaptive intersection pass: when the MLLM flags intersection_descriptors,
+    w1 absorbs w3 and w3 is set to 0.
 
     Args:
-        is_cold_start: True if k_prev is uninitialized or route changed.
+        is_cold_start: True when no proximity anchor k_PK is available.
         params: Configured DSDA parameters.
+        intersection: Value of the intersection_descriptors flag.
 
     Returns:
         Dictionary with keys 'w1', 'w2', 'w3'.
     """
     if is_cold_start:
-        return {
-            "w1": params.cold_start_w1,
-            "w2": params.cold_start_w2,
-            "w3": params.cold_start_w3,
-        }
-    return {
-        "w1": params.w1,
-        "w2": params.w2,
-        "w3": params.w3,
-    }
+        w = {"w1": params.cold_start_w1, "w2": params.cold_start_w2, "w3": params.cold_start_w3}
+    else:
+        w = {"w1": params.w1, "w2": params.w2, "w3": params.w3}
+    if intersection:
+        w = {"w1": w["w1"] + w["w3"], "w2": w["w2"], "w3": 0.0}
+    return w
 
 
 def compute_composite_score(

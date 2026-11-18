@@ -1,169 +1,120 @@
 # DSDA: Deterministic Spatial Disambiguation Algorithm
 
-A production-grade, reproducible Python implementation of the **Deterministic Spatial Disambiguation Algorithm (DSDA)** for resolving ambiguous linear-referencing crash narratives into georeferenced GIS locations along highway corridors.
+Reference Python implementation of the **Deterministic Spatial Disambiguation Algorithm (DSDA)** (Algorithm 1, Appendix A of the manuscript), which resolves linear-referencing crash descriptions (route, PK marker, landmarks) into georeferenced centerline nodes.
 
 ---
 
-## 1. Formal Mathematical Specification
+## 1. Formal specification
 
-The Contextual Compatibility Score ($C_s$) is a deterministic multi-criteria score defined as:
+The Contextual Compatibility Score of a candidate node $k$ is
 
 $$C_s(k) = w_1 \cdot S_{\text{toponym}}(m_k) + w_2 \cdot S_{\text{proximity}}(l_k) + w_3 \cdot S_{\text{topology}}(t_k) \quad \text{(A1)}$$
 
-### Standard Multi-Criteria Weights
-- $w_1 = 0.500$ (Toponymic similarity)
-- $w_2 = 0.375$ (Spatial proximity)
-- $w_3 = 0.125$ (Topological route match)
+with standard weights $w_1 = 0.500$, $w_2 = 0.375$, $w_3 = 0.125$ and acceptance gate $C_s \geq 0.85$.
+
+### Components
+
+- **Toponym match (A2).** Maximum Jaro-Winkler similarity between the extracted landmarks $T_{\text{rep}}$ and the gazetteer attributes of node $k$, with accent stripping and token cleaning.
+- **Proximity match (A3).** Gaussian decay to the nominal coordinate of the extracted kilometric post $k_{\text{PK}}$:
+  $$S_{\text{proximity}}(l_k) = \exp\left(-\frac{d(k, k_{\text{PK}})^2}{2\sigma^2}\right), \quad \sigma = 150\ \text{m}.$$
+- **Topology match.** 1.0 if node $k$ belongs to the designated route, else 0.0.
 
 ---
 
-### Component Formulations
+## 2. Algorithm 1, step by step
 
-#### 1. Toponym Match ($S_{\text{toponym}}$) &mdash; Equation A2
-Computes the maximum Jaro-Winkler string similarity ($d_{jw}$) between extracted narrative landmarks ($T_{\text{rep}}$) and GIS centerline node attributes ($T_{\text{gis}}(k)$):
+1. **Sector reference** (used only when the PK marker is omitted or ambiguous):
+   - $k_{\text{prev}}$ uninitialized or route change: $k_{\text{municipality}}$;
+   - $\Delta t \leq 24$ h since the last accepted record on the route: $k_{\text{municipality}}$;
+   - otherwise: $k_{\text{prev}}$ (last accepted record).
+2. **Candidate generation**
+   - **Primary LRS-anchored mode** (PK marker resolved on the route): the active anchor is the nominal PK post $k_{\text{PK}}$; candidates are all nodes within $R_{\max} = 500$ m of $k_{\text{PK}}$ (nodes of other routes included, their topology score is 0); base weights $(0.500, 0.375, 0.125)$. This mode is independent of record order.
+   - **Fallback mode** (PK omitted, unknown, or shared by several chainages without a sector reference): no proximity anchor; candidates are the route nodes in the active sector; base weights $(0.875, 0.000, 0.125)$.
+3. **Proximity decay** to $k_{\text{PK}}$ ($\sigma = 150$ m).
+4. **Intersection pass**: if `intersection_descriptors` is set, $w_1 \leftarrow w_1 + w_3$ and $w_3 \leftarrow 0$.
+5. **Acceptance gate**: the best candidate is accepted if $C_s \geq 0.85$; only accepted records update $k_{\text{prev}}$ (anchor independence). Rejected records go to manual review.
 
-$$S_{\text{toponym}}(m_k) = \max_{m \in T_{\text{rep}},\, g \in T_{\text{gis}}(k)} \left[ d_{jw}(m, g) \right] \quad \text{(A2)}$$
-
-Includes Unicode normalization, accent stripping (e.g. *Béni Khiar* $\leftrightarrow$ *Beni Khiar*), and token cleaning.
-
-#### 2. Proximity Match ($S_{\text{proximity}}$) &mdash; Equation A3
-Localized Gaussian decay function penalizing spatial deviation $d(k, k_{\text{prev}})$ from the chronologically prior geocoded anchor ($k_{\text{prev}}$):
-
-$$S_{\text{proximity}}(l_k) = \exp\left( -\frac{d(k, k_{\text{prev}})^2}{2 \sigma^2} \right) \quad \text{(A3)}$$
-
-- Structural bandwidth $\sigma = 150.0\,\text{m}$ (approximates the median inter-landmark spacing along corridor segments).
-- Sensitivity testing ($\sigma \in [100, 250]\,\text{m}$) demonstrates classification stability.
+**Ground truth is never used at runtime.** `CrashEvent` has no ground-truth field and the engine does not read RTK-DGPS coordinates. Positional accuracy ($E_{\text{geo}}$, median, P90, P95, RMSE) is computed afterwards with `dsda.evaluation.compute_geocoding_accuracy`, for accepted records (conditional) and for all records using the top-ranked candidate (inclusive).
 
 ---
 
-### The Three Anchor Initialization Rules
-
-To prevent recursive error propagation and handle initial corridor states, the proximity function operates under three deterministic initialization rules:
-
-1. **Rule 1: Cold Start**
-   - For the chronologically first event in a dataset, or when switching to a different route identifier, $k_{\text{prev}}$ is uninitialized.
-   - The $S_{\text{proximity}}$ component is neutralized, with $w_2$ variance absorbed by $w_1$:
-     $$w_1 = 0.875, \quad w_2 = 0.000, \quad w_3 = 0.125$$
-   - Geocoding is purely toponymic and topological.
-
-2. **Rule 2: Simultaneous Events ($\Delta t \le 24\text{h}$)**
-   - If multiple crash events occur within a tight temporal window ($\Delta t \le 24\,\text{h}$) on the same route, $k_{\text{prev}}$ defaults to the **established regional centroid of the primary municipality** rather than the immediately prior accident.
-   - Explicitly prevents tight temporal clustering artifacts.
-
-3. **Rule 3: Anchor Independence (Error Propagation Shield)**
-   - To break recursive error chains, the algorithm strictly utilizes independent anchors.
-   - If an event is flagged for manual review ($C_s < 0.85$) or exceeds the spatial error tolerance ($E_{\text{geo}} > 50\,\text{m}$), it is **rejected as an anchor**.
-   - The system reverts to the last safely geocoded event for subsequent $k_{\text{prev}}$ evaluations.
-
-#### 3. Topology Match ($S_{\text{topology}}$)
-Binary infrastructure filter:
-$$S_{\text{topology}}(t_k) = \begin{cases} 1.0 & \text{if candidate } k \text{ connects directly to the designated highway hierarchy} \\ 0.0 & \text{otherwise} \end{cases}$$
-Corridors are modeled as bidirectional single-carriageways.
-
----
-
-## 2. Package Architecture
+## 3. Package architecture
 
 ```
 dsda/
-├── __init__.py           # Package exports
-├── models.py             # Dataclasses (Point2D, GisNode, CrashEvent, Anchor, GeocodingResult)
-├── text_utils.py         # Unicode accent normalization & string sanitization
-├── metrics.py            # Equations A1, A2, A3, dynamic weight rebalancing
-├── gis_store.py          # Spatial database indexed by PK marker
-└── engine.py             # Core DSDAEngine & backward-compatible function
+├── models.py       # Point2D, GisNode, PKPost, CrashEvent, Anchor, GeocodingResult, DSDAParameters
+├── text_utils.py   # Accent normalization and string cleaning
+├── metrics.py      # Equations A1 to A3, weight resolution (incl. intersection pass)
+├── gis_store.py    # Centerline nodes, nominal PK posts, radius and sector queries
+├── engine.py       # DSDAEngine (Algorithm 1) and single-event entry point
+└── evaluation.py   # Post-hoc accuracy against ground truth (E_geo, P90, P95, RMSE)
 tests/
-├── conftest.py           # Shared fixtures
-├── test_metrics.py       # Math metric unit tests (Gaussian decay, Jaro-Winkler, weights)
-├── test_anchor_rules.py  # Rule 1 (Cold start), Rule 2 (Simultaneous), Rule 3 (Anchor independence)
-├── test_engine.py        # Database querying, summary formatting, sigma sensitivity
-└── test_poc_parity.py    # Exact numerical parity against the prototype script
+├── conftest.py            # Fixtures (Figure 3 example, synthetic corridor)
+├── test_metrics.py        # Similarity functions and weights
+├── test_anchor_rules.py   # LRS-anchored mode, sector rules, intersection pass, no runtime ground truth
+├── test_engine.py         # GIS queries, summaries, sigma sensitivity
+├── test_evaluation.py     # Post-hoc accuracy and percentiles
+└── test_poc_parity.py     # Values of Figure 3 (panel c)
 ```
 
 ---
 
-## 3. Installation
+## 4. Installation
 
 ```bash
-pip install .
-```
-
-For development and running tests:
-```bash
-pip install -e ".[dev]"
+pip install .            # library
+pip install -e ".[dev]"  # with pytest
 ```
 
 ---
 
-## 4. Quick Start
+## 5. Quick start
 
-### A. Backward-Compatible POC Call
+### A. Single event (Figure 3 example)
 ```python
 from dsda import dsda_algorithm_with_logs
 
-base_sig = [
-    {
-        "node_name": "Node P3 (Target)",
-        "PK_marker": "PK34",
-        "Gazetteer": "B. Khair",
-        "Highway_Hierarchy": "RR27",
-        "x": 500068.85,
-        "y": 3700000,
-        "WGS84_Coordinates": (33.881, 10.098),
-    },
-    {
-        "node_name": "Node P1 (Bypass)",
-        "PK_marker": "PK34",
-        "Gazetteer": "B. K",
-        "Highway_Hierarchy": "RR27",
-        "x": 500126.69,
-        "y": 3700000,
-        "WGS84_Coordinates": (33.882, 10.099),
-    },
+nodes = [
+    {"node_name": "Node P3 (Bridge)",  "PK_marker": "PK34", "Gazetteer": "Hydraulic bridge",
+     "Highway_Hierarchy": "RR27", "x": 500068.85, "y": 3700000},
+    {"node_name": "Node P1 (Culvert)", "PK_marker": "PK34", "Gazetteer": "Hydraulic culvert",
+     "Highway_Hierarchy": "RR27", "x": 500126.69, "y": 3700000},
 ]
 
-# Standard Call with prior anchor
 result = dsda_algorithm_with_logs(
     pk_marker="PK34",
-    t_rep="B. Khiar",
+    t_rep="Hydraulic bridge (PK 34)",
     target_route="RR27",
-    k_prev={"x": 500000, "y": 3700000},
-    gis_database=base_sig,
+    k_pk={"x": 500000, "y": 3700000},   # nominal coordinate of the PK 34 post
+    gis_database=nodes,
 )
-
-print(result["Decision"])
-# Output: AUTO-VALIDATED: Node P3 (Target) -> (33.881, 10.098)
+print(result["Decision"])   # AUTO-VALIDATED: Node P3 (Bridge) -> (500068.85, 3700000.0)
 ```
 
-### B. High-Level Engine & Corridor Sequence Processing
+### B. Corridor processing and post-hoc evaluation
 ```python
 from datetime import datetime
-from dsda import DSDAEngine, GisDatabase, CrashEvent, Point2D
+from dsda import (CrashEvent, DSDAEngine, GisDatabase, PKPost, Point2D,
+                  compute_geocoding_accuracy)
 
-gis_db = GisDatabase.from_records(...)
-engine = DSDAEngine()
-
+gis_db = GisDatabase.from_records(node_records, pk_posts=[
+    PKPost(route="RR27", pk_marker="PK34", coords=Point2D(500000.0, 3700000.0)),
+])
 events = [
-    CrashEvent(
-        event_id="CRASH_01",
-        route="RR27",
-        pk_marker="PK34",
-        narrative_landmarks=["B. Khiar"],
-        timestamp=datetime(2025, 1, 1, 9, 0),
-        municipality_centroid=Point2D(500050.0, 3700020.0),
-    ),
+    CrashEvent(event_id="CRASH_01", route="RR27", pk_marker="PK34",
+               narrative_landmarks=["Hydraulic bridge"],
+               timestamp=datetime(2025, 1, 1, 9, 0)),
 ]
+results = DSDAEngine().process_corridor(events, gis_db)
 
-results = engine.process_corridor(events, gis_db)
-for res in results:
-    print(res.summary_table())
+# Ground truth only now, after all decisions are taken
+report = compute_geocoding_accuracy(results, ground_truth={"CRASH_01": Point2D(500070.0, 3700001.0)})
+print(report.acceptance_rate, report.conditional, report.inclusive)
 ```
 
 ---
 
-## 5. Running the Test Suite
-
-Run all 32 unit and regression tests with `pytest`:
+## 6. Tests
 
 ```bash
 pytest -v

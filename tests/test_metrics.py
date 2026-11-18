@@ -120,6 +120,13 @@ class TestWeightsAndCompositeScore:
         assert w["w3"] == 0.125
         assert math.isclose(sum(w.values()), 1.0)
 
+    def test_intersection_pass_weights(self):
+        params = DSDAParameters()
+        w = resolve_weights(is_cold_start=False, params=params, intersection=True)
+        assert w == {"w1": 0.625, "w2": 0.375, "w3": 0.0}
+        w = resolve_weights(is_cold_start=True, params=params, intersection=True)
+        assert w == {"w1": 1.0, "w2": 0.0, "w3": 0.0}
+
     def test_composite_score_calculation(self):
         weights = {"w1": 0.5, "w2": 0.375, "w3": 0.125}
         cs = compute_composite_score(s_toponym=1.0, s_proximity=0.8, s_topology=1.0, weights=weights)
@@ -135,3 +142,6 @@ class TestWeightsAndCompositeScore:
 
         with pytest.raises(ValueError, match="Validation threshold must be in"):
             DSDAParameters(validation_threshold=1.5)
+
+        with pytest.raises(ValueError, match="r_max must be strictly positive"):
+            DSDAParameters(r_max=0.0)

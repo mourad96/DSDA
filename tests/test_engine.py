@@ -1,6 +1,5 @@
 """Tests for DSDAEngine core execution and GIS database operations."""
 
-import pytest
 from dsda.engine import DSDAEngine
 from dsda.gis_store import GisDatabase
 from dsda.models import (
@@ -9,80 +8,58 @@ from dsda.models import (
     CrashEvent,
     DSDAParameters,
     GeocodingStatus,
-    GisNode,
     Point2D,
 )
 
 
 class TestGisDatabase:
-    """Tests for spatial repository indexing and lookups."""
-
     def test_pk_normalization_lookup(self, poc_gis_database):
-        # Should match despite whitespace or casing
-        nodes_std = poc_gis_database.query_by_pk("PK34")
-        nodes_spaced = poc_gis_database.query_by_pk(" pk 34 ")
-        assert len(nodes_std) == 4
-        assert len(nodes_spaced) == 4
+        assert len(poc_gis_database.query_by_pk("PK34")) == 4
+        assert len(poc_gis_database.query_by_pk(" pk 34 ")) == 4
+
+    def test_pk_post_resolution(self, poc_gis_database, pk34_post):
+        post = poc_gis_database.resolve_pk_post("rr27", "pk 34")
+        assert post is not None and post.coords == pk34_post
+        assert poc_gis_database.resolve_pk_post("RR27", None) is None
+        assert poc_gis_database.resolve_pk_post("RR27", "PK99") is None
+
+    def test_query_within_radius(self, poc_gis_database, pk34_post):
+        assert len(poc_gis_database.query_within_radius(pk34_post, 500.0)) == 4
+        assert len(poc_gis_database.query_within_radius(pk34_post, 140.0)) == 2
 
     def test_nearest_node_lookup(self, poc_gis_database):
-        target_point = Point2D(500070.0, 3700000.0)
-        nearest = poc_gis_database.find_nearest_node(target_point, route="RR27")
-        assert nearest is not None
-        assert nearest.node_name == "Node P3 (Target)"
+        nearest = poc_gis_database.find_nearest_node(Point2D(500070.0, 3700000.0), route="RR27")
+        assert nearest is not None and nearest.node_name == "Node P3 (Bridge)"
 
     def test_from_records_and_len(self, poc_base_sig_dicts):
         db = GisDatabase.from_records(poc_base_sig_dicts)
-        assert len(db) == 4
-        all_nodes = list(db)
-        assert len(all_nodes) == 4
+        assert len(db) == 4 and len(list(db)) == 4
 
 
 class TestEngineEvaluation:
-    """Tests for DSDAEngine single event evaluation and reporting."""
-
     def test_no_candidates_returns_rejected_status(self):
-        engine = DSDAEngine()
-        event = CrashEvent(
-            event_id="E_NONE",
-            route="RR27",
-            pk_marker="PK999",
-            narrative_landmarks=["Nonexistent"],
-        )
-        result = engine.evaluate_event(event=event, anchor=None, candidates=[])
+        event = CrashEvent(event_id="E_NONE", route="RR27", pk_marker="PK999", narrative_landmarks=["Nonexistent"])
+        result = DSDAEngine().evaluate_event(event, candidates=[])
         assert result.status == GeocodingStatus.NO_CANDIDATES
         assert result.selected_node is None
         assert result.best_score == 0.0
         assert "No candidates found" in result.decision_message
 
     def test_summary_table_formatting(self, poc_gis_database):
-        engine = DSDAEngine()
-        event = CrashEvent(
-            event_id="E_TABLE",
-            route="RR27",
-            pk_marker="PK34",
-            narrative_landmarks=["B. Khiar"],
-        )
-        candidates = poc_gis_database.query_by_pk("PK34")
-        result = engine.evaluate_event(event=event, anchor=None, candidates=candidates)
+        event = CrashEvent(event_id="E_TABLE", route="RR27", pk_marker="PK34",
+                           narrative_landmarks=["Hydraulic bridge (PK 34)"])
+        result = DSDAEngine().resolve_event(event, poc_gis_database)
         table = result.summary_table()
-        assert "E_TABLE" in table
-        assert "Node P3 (Target)" in table
-        assert "AUTO-VALIDATED" in table
+        assert "E_TABLE" in table and "Node P3 (Bridge)" in table
+        assert "AUTO-VALIDATED" in table and "LRS_ANCHORED" in table
 
-    def test_sigma_sensitivity_stability(self, poc_gis_database):
-        """Verify paper finding: sensitivity testing sigma in [100, 250]m confirms classification stability."""
-        anchor = Anchor(coords=Point2D(500000.0, 3700000.0), anchor_type=AnchorType.PRIOR_EVENT)
-        candidates = poc_gis_database.query_by_pk("PK34")
-        event = CrashEvent(
-            event_id="E_SENSITIVITY",
-            route="RR27",
-            pk_marker="PK34",
-            narrative_landmarks=["B. Khiar"],
-        )
-
+    def test_sigma_sensitivity_stability(self, poc_gis_database, pk34_post):
+        """Classification stable for sigma in [100, 250] m (Appendix A.1)."""
+        anchor = Anchor(coords=pk34_post, anchor_type=AnchorType.PK_POST, route="RR27")
+        candidates = poc_gis_database.query_within_radius(pk34_post, 500.0)
+        event = CrashEvent(event_id="E_SIGMA", route="RR27", pk_marker="PK34",
+                           narrative_landmarks=["Hydraulic bridge (PK 34)"])
         for sigma in [100.0, 150.0, 200.0, 250.0]:
-            engine = DSDAEngine(DSDAParameters(sigma=sigma))
-            result = engine.evaluate_event(event, anchor, candidates)
+            result = DSDAEngine(DSDAParameters(sigma=sigma)).evaluate_event(event, candidates, pk_anchor=anchor)
             assert result.status == GeocodingStatus.AUTO_VALIDATED
-            assert result.selected_node.node_name == "Node P3 (Target)"
-            assert result.best_score >= 0.85
+            assert result.selected_node.node_name == "Node P3 (Bridge)"

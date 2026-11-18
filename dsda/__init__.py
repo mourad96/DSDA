@@ -5,6 +5,7 @@ Reproducibility framework and production-grade implementation of DSDA
 """
 
 from dsda.engine import DSDAEngine, dsda_algorithm_with_logs
+from dsda.evaluation import AccuracyReport, ErrorSummary, compute_geocoding_accuracy, percentile_linear
 from dsda.gis_store import GisDatabase
 from dsda.metrics import (
     compute_composite_score,
@@ -22,7 +23,9 @@ from dsda.models import (
     GeocodingResult,
     GeocodingStatus,
     GisNode,
+    PKPost,
     Point2D,
+    ResolutionMode,
     WGS84Point,
 )
 from dsda.text_utils import normalize_toponym, strip_accents
@@ -31,6 +34,12 @@ __all__ = [
     "DSDAEngine",
     "dsda_algorithm_with_logs",
     "GisDatabase",
+    "PKPost",
+    "ResolutionMode",
+    "AccuracyReport",
+    "ErrorSummary",
+    "compute_geocoding_accuracy",
+    "percentile_linear",
     "Point2D",
     "WGS84Point",
     "GisNode",
