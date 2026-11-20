@@ -1,13 +1,14 @@
-"""Algorithm 1: LRS-anchored mode, sector reference rules, intersection pass,
-anchor independence, and absence of ground truth at runtime."""
+"""Algorithm 1 (stateless): LRS-anchored mode, municipal sector reference,
+intersection pass, deterministic tie-breaking, and absence of ground truth
+at runtime."""
 
 import dataclasses
+import random
 from datetime import datetime
 
 from dsda.engine import DSDAEngine
 from dsda.gis_store import GisDatabase
 from dsda.models import (
-    Anchor,
     AnchorType,
     CrashEvent,
     GeocodingStatus,
@@ -37,30 +38,56 @@ class TestPrimaryLrsAnchoredMode:
         assert res.status == GeocodingStatus.AUTO_VALIDATED
         assert res.selected_node.node_name == "RR27_PK34_Bridge"
 
-    def test_candidates_limited_to_r_max(self, corridor_gis_db):
+    def test_candidates_limited_to_r_max_all_routes(self, corridor_gis_db):
         res = DSDAEngine().resolve_event(
             _event("E1", "PK34", "Hydraulic bridge (PK 34)", None), corridor_gis_db
         )
         names = {c.node.node_name for c in res.candidate_evaluations}
-        # PK33 and PK35 nodes are 1.5 km away: outside R_max = 500 m
+        # PK33 and PK35 nodes are 1.5 km away: outside R_max = 500 m.
+        # The RR43 node is kept (all routes queried) with S_topology = 0.
         assert names == {"RR27_PK34_Bridge", "RR27_PK34_Culvert", "RR43_PK34_Cross"}
         assert all(c.distance_m <= 500.0 for c in res.candidate_evaluations)
 
-    def test_order_independence(self, corridor_gis_db):
-        engine = DSDAEngine()
-        target = _event("T", "PK34", "Hydraulic bridge (PK 34)", datetime(2025, 3, 1, 10))
-        others = [
+
+class TestStatelessness:
+    def _events(self):
+        return [
             _event("A", "PK33", "Maamoura Sud", datetime(2025, 1, 1, 8)),
-            _event("B", "PK35", "El Mazraa Nord", datetime(2025, 2, 1, 8)),
+            _event("B", "PK34", "Unknown Landmark XYZ QWERTY", datetime(2025, 1, 1, 9)),
+            _event("C", None, "El Mazraa Nord", datetime(2025, 1, 1, 10), municipality_centroid=NABEUL_CENTROID),
+            _event("D", "PK34", "Hydraulic bridge (PK 34)", datetime(2025, 1, 3, 8)),
+            _event("E", None, "Hydraulic bridge", datetime(2025, 2, 1, 8), municipality_centroid=NABEUL_CENTROID),
         ]
-        alone = engine.process_corridor([target], corridor_gis_db)[0]
-        in_sequence = engine.process_corridor(others + [target], corridor_gis_db)[-1]
-        assert alone.selected_node == in_sequence.selected_node
-        assert alone.best_score == in_sequence.best_score
-        assert alone.anchor_used.coords == in_sequence.anchor_used.coords
+
+    @staticmethod
+    def _signature(r):
+        return (r.event_id, r.status, r.selected_node.node_name if r.selected_node else None,
+                round(r.best_score, 12), r.mode)
+
+    def test_result_independent_of_order_and_of_other_records(self, corridor_gis_db):
+        engine = DSDAEngine()
+        events = self._events()
+        alone = {e.event_id: self._signature(engine.resolve_event(e, corridor_gis_db)) for e in events}
+        for seed in range(5):
+            shuffled = events[:]
+            random.Random(seed).shuffle(shuffled)
+            for r in engine.process_corridor(shuffled, corridor_gis_db):
+                assert self._signature(r) == alone[r.event_id]
+
+    def test_sector_reference_is_always_the_municipality(self, corridor_gis_db):
+        engine = DSDAEngine()
+        for r in engine.process_corridor(self._events(), corridor_gis_db):
+            if r.mode == ResolutionMode.SECTOR_FALLBACK:
+                assert r.sector_reference.anchor_type == AnchorType.MUNICIPALITY_CENTROID
+                assert r.sector_reference.coords == NABEUL_CENTROID
+
+    def test_engine_has_no_state_variable(self):
+        import dsda.engine as eng
+        src = open(eng.__file__, encoding="utf-8").read()
+        assert "k_prev" not in src and "PRIOR_EVENT" not in src
 
 
-class TestFallbackAndSectorReference:
+class TestFallbackMode:
     def test_omitted_pk_uses_fallback_weights(self, corridor_gis_db):
         ev = _event("E1", None, "Hydraulic bridge", datetime(2025, 1, 1, 10),
                     municipality_centroid=NABEUL_CENTROID)
@@ -69,23 +96,8 @@ class TestFallbackAndSectorReference:
         assert res.anchor_used is None
         assert res.weights_used == {"w1": 0.875, "w2": 0.000, "w3": 0.125}
         assert all(c.s_proximity == 0.0 for c in res.candidate_evaluations)
-        assert res.sector_reference.anchor_type == AnchorType.MUNICIPALITY_CENTROID
 
-    def test_sector_reference_rules(self, corridor_gis_db):
-        engine = DSDAEngine()
-        prev = Anchor(coords=Point2D(500200.0, 3701500.0), anchor_type=AnchorType.PRIOR_EVENT,
-                      source_id="P", timestamp=datetime(2025, 1, 1, 8), route="RR27")
-        within_24h = _event("E", None, "x", datetime(2025, 1, 1, 20), municipality_centroid=NABEUL_CENTROID)
-        after_24h = _event("E", None, "x", datetime(2025, 1, 3, 8), municipality_centroid=NABEUL_CENTROID)
-        other_route = _event("E", None, "x", datetime(2025, 1, 3, 8), route="MC28",
-                             municipality_centroid=NABEUL_CENTROID)
-
-        assert engine.sector_reference(within_24h, None).anchor_type == AnchorType.MUNICIPALITY_CENTROID
-        assert engine.sector_reference(within_24h, prev).anchor_type == AnchorType.MUNICIPALITY_CENTROID
-        assert engine.sector_reference(after_24h, prev) is prev
-        assert engine.sector_reference(other_route, prev).anchor_type == AnchorType.MUNICIPALITY_CENTROID
-
-    def test_ambiguous_pk_resolved_by_sector(self):
+    def test_ambiguous_pk_resolved_by_municipal_sector(self):
         # Same label "PK10" on two chainages of the same route (local vs national)
         posts = [
             PKPost(route="RN15", pk_marker="PK10", coords=Point2D(0.0, 0.0), sector="national"),
@@ -122,20 +134,47 @@ class TestIntersectionPass:
         assert res.weights_used == {"w1": 1.0, "w2": 0.0, "w3": 0.0}
 
 
-class TestAnchorIndependence:
-    def test_rejected_event_does_not_update_k_prev(self, corridor_gis_db):
-        events = [
-            _event("E1", "PK33", "Maamoura Sud", datetime(2025, 1, 1, 8)),
-            _event("E2", "PK34", "Unknown Landmark XYZ QWERTY", datetime(2025, 1, 3, 8)),
-            _event("E3", None, "El Mazraa Nord", datetime(2025, 1, 5, 8)),
+class TestDeterministicTieBreaking:
+    """Highest Cs, then smallest distance d to the anchor, then Node_ID."""
+
+    POST = Point2D(0.0, 0.0)
+
+    def _db(self, nodes):
+        return GisDatabase(nodes, pk_posts=[PKPost("RR27", "PK1", self.POST)])
+
+    def test_equal_cs_smaller_distance_wins(self):
+        # Same gazetteer and route, equidistant on each side would tie on Cs:
+        # place them at 100 m and 100 m but on different axes -> same d; use
+        # the toponymy-only configuration to create a Cs tie at different d.
+        from dsda.models import DSDAParameters
+        nodes = [
+            GisNode("B_far", "PK1", ["Oued"], "RR27", Point2D(300.0, 0.0)),
+            GisNode("A_near", "PK1", ["Oued"], "RR27", Point2D(120.0, 0.0)),
         ]
-        res = DSDAEngine().process_corridor(events, corridor_gis_db)
-        assert res[0].status == GeocodingStatus.AUTO_VALIDATED
-        assert res[1].status == GeocodingStatus.MANUAL_REVIEW_REQUIRED
-        assert res[1].is_safe_anchor is False
-        # E3 (> 24 h, PK omitted): sector reference is the last ACCEPTED event, E1
-        assert res[2].sector_reference.anchor_type == AnchorType.PRIOR_EVENT
-        assert res[2].sector_reference.source_id == "E1"
+        engine = DSDAEngine(DSDAParameters(w1=1.0, w2=0.0, w3=0.0))
+        res = engine.resolve_event(CrashEvent("E", "RR27", "PK1", ["Oued"]), self._db(nodes))
+        assert res.candidate_evaluations[0].cs_score == res.candidate_evaluations[1].cs_score
+        assert res.selected_node.node_name == "A_near"
+
+    def test_equal_cs_and_distance_lexicographic_id(self):
+        nodes = [
+            GisNode("node_b", "PK1", ["Oued"], "RR27", Point2D(0.0, 100.0)),
+            GisNode("node_a", "PK1", ["Oued"], "RR27", Point2D(100.0, 0.0)),
+        ]
+        for order in (nodes, nodes[::-1]):
+            res = DSDAEngine().resolve_event(CrashEvent("E", "RR27", "PK1", ["Oued"]), self._db(order))
+            assert res.candidate_evaluations[0].cs_score == res.candidate_evaluations[1].cs_score
+            assert res.selected_node.node_name == "node_a"
+
+    def test_fallback_tie_uses_node_id(self):
+        nodes = [
+            GisNode("node_z", "PK9", ["Oued"], "RR27", Point2D(10.0, 0.0)),
+            GisNode("node_m", "PK9", ["Oued"], "RR27", Point2D(900.0, 0.0)),
+        ]
+        db = GisDatabase(nodes)
+        res = DSDAEngine().resolve_event(CrashEvent("E", "RR27", None, ["Oued"]), db)
+        assert res.mode == ResolutionMode.SECTOR_FALLBACK
+        assert res.selected_node.node_name == "node_m"  # d = 0 for all: Node_ID decides
 
 
 class TestNoGroundTruthAtRuntime:

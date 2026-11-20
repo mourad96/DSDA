@@ -4,7 +4,7 @@ import math
 from dsda.engine import dsda_algorithm_with_logs
 
 K_PK = {"x": 500000, "y": 3700000}
-T_REP = "Hydraulic bridge (PK 34)"
+T_REP = "Hydraulic bridge (Maamoura)"
 
 
 def _log(res, name):
@@ -31,24 +31,29 @@ class TestFigure3Example:
 
         p3 = _log(res, "Node P3 (Bridge)")
         assert math.isclose(p3["Distance_m"], 68.85, abs_tol=0.01)
-        assert math.isclose(p3["S_Toponym"], 0.945, abs_tol=0.001)
+        assert math.isclose(p3["S_Toponym"], 0.928, abs_tol=0.001)
         assert math.isclose(p3["S_Proximity"], 0.900, abs_tol=0.001)
         assert p3["S_Topology"] == 1.0
-        assert math.isclose(p3["Cs_Score"], 0.935, abs_tol=0.001)
+        assert math.isclose(p3["Cs_Score"], 0.927, abs_tol=0.001)
 
         p1 = _log(res, "Node P1 (Culvert)")
-        assert math.isclose(p1["S_Toponym"], 0.834, abs_tol=0.001)
+        assert math.isclose(p1["S_Toponym"], 0.842, abs_tol=0.001)
         assert math.isclose(p1["S_Proximity"], 0.700, abs_tol=0.001)
         assert p1["S_Topology"] == 1.0
+        assert math.isclose(p1["Cs_Score"], 0.808, abs_tol=0.001)
         assert p1["Cs_Score"] < 0.85  # near miss, would go to manual review
 
         p2 = _log(res, "Node P2 (RR43)")
+        assert math.isclose(p2["S_Toponym"], 0.511, abs_tol=0.001)
         assert math.isclose(p2["S_Proximity"], 0.600, abs_tol=0.001)
         assert p2["S_Topology"] == 0.0
+        assert math.isclose(p2["Cs_Score"], 0.480, abs_tol=0.001)
 
         p4 = _log(res, "Node P4 (MC28)")
+        assert math.isclose(p4["S_Toponym"], 0.447, abs_tol=0.001)
         assert math.isclose(p4["S_Proximity"], 0.300, abs_tol=0.001)
         assert p4["S_Topology"] == 0.0
+        assert math.isclose(p4["Cs_Score"], 0.336, abs_tol=0.001)
 
     def test_fallback_without_pk_post(self, poc_base_sig_dicts):
         res = dsda_algorithm_with_logs(
@@ -63,8 +68,8 @@ class TestFigure3Example:
         top = res["Logs"][0]
         assert top["Node"] == "Node P3 (Bridge)"
         assert top["S_Proximity"] == 0.0
-        # 0.875 * 0.945 + 0.125 * 1.0
-        assert math.isclose(top["Cs_Score"], 0.952, abs_tol=0.001)
+        # 0.875 * 0.928 + 0.125 * 1.0
+        assert math.isclose(top["Cs_Score"], 0.937, abs_tol=0.001)
 
     def test_unrelated_landmark_is_rejected(self, poc_base_sig_dicts):
         res = dsda_algorithm_with_logs(

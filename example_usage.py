@@ -27,7 +27,7 @@ def main() -> None:
     print("[1] Figure 3 example (anchor = nominal PK 34 post)")
     res = dsda_algorithm_with_logs(
         pk_marker="PK34",
-        t_rep="Hydraulic bridge (PK 34)",
+        t_rep="Hydraulic bridge (Maamoura)",
         target_route="RR27",
         k_pk={"x": PK34_POST.x, "y": PK34_POST.y},
         gis_database=FIG3_NODES,

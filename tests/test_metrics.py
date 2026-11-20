@@ -44,7 +44,7 @@ class TestToponymSimilarity:
 class TestProximitySimilarity:
     """Tests for ProximityMatch S_proximity (Equation A3)."""
 
-    def test_cold_start_none_anchor_returns_zero(self):
+    def test_no_anchor_returns_zero(self):
         cand = Point2D(500000.0, 3700000.0)
         s_prox, dist = compute_proximity_similarity(cand, None, sigma=150.0)
         assert s_prox == 0.0
@@ -104,9 +104,9 @@ class TestTopologySimilarity:
 class TestWeightsAndCompositeScore:
     """Tests for weight resolution and Equation A1 composite score."""
 
-    def test_cold_start_weights(self):
+    def test_fallback_weights(self):
         params = DSDAParameters()
-        w = resolve_weights(is_cold_start=True, params=params)
+        w = resolve_weights(is_fallback=True, params=params)
         assert w["w1"] == 0.875
         assert w["w2"] == 0.000
         assert w["w3"] == 0.125
@@ -114,7 +114,7 @@ class TestWeightsAndCompositeScore:
 
     def test_standard_weights(self):
         params = DSDAParameters()
-        w = resolve_weights(is_cold_start=False, params=params)
+        w = resolve_weights(is_fallback=False, params=params)
         assert w["w1"] == 0.500
         assert w["w2"] == 0.375
         assert w["w3"] == 0.125
@@ -122,10 +122,18 @@ class TestWeightsAndCompositeScore:
 
     def test_intersection_pass_weights(self):
         params = DSDAParameters()
-        w = resolve_weights(is_cold_start=False, params=params, intersection=True)
+        w = resolve_weights(is_fallback=False, params=params, intersection=True)
         assert w == {"w1": 0.625, "w2": 0.375, "w3": 0.0}
-        w = resolve_weights(is_cold_start=True, params=params, intersection=True)
+        w = resolve_weights(is_fallback=True, params=params, intersection=True)
         assert w == {"w1": 1.0, "w2": 0.0, "w3": 0.0}
+
+    def test_fallback_weights_for_ablation_configs(self):
+        # w2 transferred to toponymy: nominal (0.500, 0.375, 0.125) -> (0.875, 0, 0.125)
+        fb = DSDAParameters(w1=0.571, w2=0.429, w3=0.0).fallback_weights()
+        assert math.isclose(fb["w1"], 1.0) and fb["w2"] == 0.0 and fb["w3"] == 0.0
+        assert DSDAParameters(w1=0.8, w2=0.0, w3=0.2).fallback_weights() == {"w1": 0.8, "w2": 0.0, "w3": 0.2}
+        pk_only = DSDAParameters(w1=0.0, w2=1.0, w3=0.0, fallback_policy="reject")
+        assert pk_only.fallback_weights() == {"w1": 0.0, "w2": 0.0, "w3": 0.0}
 
     def test_composite_score_calculation(self):
         weights = {"w1": 0.5, "w2": 0.375, "w3": 0.125}
@@ -137,8 +145,8 @@ class TestWeightsAndCompositeScore:
         with pytest.raises(ValueError, match="Standard weights must sum to 1.0"):
             DSDAParameters(w1=0.6, w2=0.6, w3=0.1)
 
-        with pytest.raises(ValueError, match="Cold start weights must sum to 1.0"):
-            DSDAParameters(cold_start_w1=0.5, cold_start_w2=0.0, cold_start_w3=0.1)
+        with pytest.raises(ValueError, match="non-negative"):
+            DSDAParameters(w1=1.2, w2=-0.2, w3=0.0)
 
         with pytest.raises(ValueError, match="Validation threshold must be in"):
             DSDAParameters(validation_threshold=1.5)

@@ -117,29 +117,30 @@ def compute_topology_similarity(
 
 
 def resolve_weights(
-    is_cold_start: bool,
+    is_fallback: bool,
     params: DSDAParameters,
     intersection: bool = False,
 ) -> Dict[str, float]:
     """Determine multi-criteria weights (Algorithm 1, steps 2 and 4).
 
-    Base weights: standard (0.500, 0.375, 0.125) in LRS-anchored mode;
-    fallback / cold start (0.875, 0.000, 0.125) when no k_PK anchor exists,
-    i.e. S_proximity is neutralized and w2 is absorbed by w1.
+    Primary LRS-anchored mode: base weights (w1, w2, w3), by default
+    (0.500, 0.375, 0.125). Fallback mode (no k_PK anchor): w2 = 0 and its
+    weight is transferred to toponymy, by default (0.875, 0.000, 0.125)
+    (see DSDAParameters.fallback_weights).
 
     Adaptive intersection pass: when the MLLM flags intersection_descriptors,
     w1 absorbs w3 and w3 is set to 0.
 
     Args:
-        is_cold_start: True when no proximity anchor k_PK is available.
+        is_fallback: True when no proximity anchor k_PK is available.
         params: Configured DSDA parameters.
         intersection: Value of the intersection_descriptors flag.
 
     Returns:
         Dictionary with keys 'w1', 'w2', 'w3'.
     """
-    if is_cold_start:
-        w = {"w1": params.cold_start_w1, "w2": params.cold_start_w2, "w3": params.cold_start_w3}
+    if is_fallback:
+        w = params.fallback_weights()
     else:
         w = {"w1": params.w1, "w2": params.w2, "w3": params.w3}
     if intersection:

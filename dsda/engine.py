@@ -1,19 +1,20 @@
-"""DSDA engine: strict implementation of Algorithm 1 (Appendix A.2).
+"""DSDA engine: implementation of Algorithm 1 (Appendix A.2), stateless.
 
-Step 1  Sector reference (only used when the PK marker is omitted or ambiguous):
-        k_prev uninitialized or route change  -> k_municipality
-        t_current - k_prev.timestamp <= 24 h  -> k_municipality
-        otherwise                             -> k_prev
+Step 1  Sector reference: sector_ref <- k_municipality (no state carried
+        between records; results do not depend on processing order).
 Step 2  Candidate generation:
         PK marker resolved on the route       -> primary LRS-anchored mode:
-            active anchor = nominal PK post k_PK, candidates within R_max = 500 m,
-            base weights (0.500, 0.375, 0.125); order-independent.
+            active anchor = nominal PK post k_PK, candidates = all nodes
+            (all routes) within R_max = 500 m, base weights (0.500, 0.375, 0.125).
         otherwise                             -> fallback mode:
-            no proximity anchor, candidates in the active sector,
-            base weights (0.875, 0.000, 0.125).
+            no proximity anchor, route nodes in the municipal sector,
+            weights (0.875, 0.000, 0.125).
 Step 3  Gaussian proximity decay to k_PK (sigma = 150 m).
 Step 4  Intersection pass: w1 <- w1 + w3, w3 <- 0.
-Step 5  Acceptance gate Cs >= 0.85; only accepted nodes update k_prev.
+        Deterministic tie-breaking: highest Cs, then smallest distance d to
+        the active anchor (d = 0 for every candidate in fallback mode), then
+        lexicographic Node_ID (node_name).
+Step 5  Acceptance gate Cs >= 0.85; otherwise manual review.
 
 Ground-truth coordinates are never used here. Positional accuracy
 (E_geo, P90, P95) is computed post hoc in dsda.evaluation.
@@ -74,10 +75,25 @@ class DSDAEngine:
         if mode is None:
             mode = ResolutionMode.LRS_ANCHORED if pk_anchor is not None else ResolutionMode.SECTOR_FALLBACK
         weights = resolve_weights(
-            is_cold_start=(pk_anchor is None),
+            is_fallback=(pk_anchor is None),
             params=self.params,
             intersection=event.intersection_descriptors,
         )
+
+        if pk_anchor is None and self.params.fallback_policy == "reject":
+            return GeocodingResult(
+                event_id=event.event_id,
+                status=GeocodingStatus.MANUAL_REVIEW_REQUIRED,
+                selected_node=None,
+                best_score=0.0,
+                candidate_evaluations=[],
+                weights_used=weights,
+                anchor_used=None,
+                mode=mode,
+                sector_reference=sector_reference,
+                accepted=False,
+                decision_message="REJECTED: Manual Review Required (no resolvable PK marker)",
+            )
 
         if not candidates:
             return GeocodingResult(
@@ -90,14 +106,12 @@ class DSDAEngine:
                 anchor_used=pk_anchor,
                 mode=mode,
                 sector_reference=sector_reference,
-                is_safe_anchor=False,
+                accepted=False,
                 decision_message=f"REJECTED: No candidates found for marker {event.pk_marker}",
             )
 
         anchor_point = pk_anchor.coords if pk_anchor is not None else None
         evaluations: List[CandidateEvaluation] = []
-        best_candidate: Optional[GisNode] = None
-        best_score = 0.0
 
         for node in candidates:
             s_toponym = compute_toponym_similarity(
@@ -107,6 +121,8 @@ class DSDAEngine:
             )
             if anchor_point is None or weights["w2"] == 0.0:
                 s_proximity = 0.0
+                # d is still measured to k_PK when it exists (tie-breaking);
+                # in fallback mode there is no anchor and d = 0 for all nodes.
                 dist_m = node.coords.distance_to(anchor_point) if anchor_point is not None else 0.0
             else:
                 s_proximity, dist_m = compute_proximity_similarity(
@@ -134,11 +150,13 @@ class DSDAEngine:
                     cs_score=cs_score,
                 )
             )
-            if best_candidate is None or cs_score > best_score:
-                best_score = cs_score
-                best_candidate = node
 
-        evaluations.sort(key=lambda c: c.cs_score, reverse=True)
+        # Deterministic tie-breaking: highest Cs, then smallest d, then Node_ID.
+        # Equivalent to the loop of Algorithm 1 and independent of the order
+        # in which candidates are returned by the GIS query.
+        evaluations.sort(key=_ranking_key)
+        best_candidate = evaluations[0].node
+        best_score = evaluations[0].cs_score
 
         # Step 5: acceptance gate, based on Cs only
         accepted = best_candidate is not None and best_score >= self.params.validation_threshold
@@ -167,44 +185,28 @@ class DSDAEngine:
             anchor_used=pk_anchor,
             mode=mode,
             sector_reference=sector_reference,
-            is_safe_anchor=accepted,
+            accepted=accepted,
             decision_message=decision,
         )
 
     # ------------------------------------------------------------------
     # Steps 1 and 2
     # ------------------------------------------------------------------
-    def sector_reference(self, event: CrashEvent, k_prev: Optional[Anchor]) -> Optional[Anchor]:
-        """Step 1: sector reference for omitted or multi-sector PK markers."""
-        municipality = (
-            Anchor(
-                coords=event.municipality_centroid,
-                anchor_type=AnchorType.MUNICIPALITY_CENTROID,
-                source_id=f"Centroid for {event.event_id}",
-                timestamp=event.timestamp,
-                route=event.route,
-            )
-            if event.municipality_centroid is not None
-            else None
+    @staticmethod
+    def sector_reference(event: CrashEvent) -> Optional[Anchor]:
+        """Step 1 (stateless): sector_ref <- k_municipality."""
+        if event.municipality_centroid is None:
+            return None
+        return Anchor(
+            coords=event.municipality_centroid,
+            anchor_type=AnchorType.MUNICIPALITY_CENTROID,
+            source_id=f"Centroid for {event.event_id}",
+            route=event.route,
         )
-        if k_prev is None or _norm(k_prev.route) != _norm(event.route):
-            return municipality
-        if (
-            event.timestamp is not None
-            and k_prev.timestamp is not None
-            and (event.timestamp - k_prev.timestamp) <= self.params.simultaneous_window
-        ):
-            return municipality
-        return k_prev
 
-    def resolve_event(
-        self,
-        event: CrashEvent,
-        gis_db: GisDatabase,
-        k_prev: Optional[Anchor] = None,
-    ) -> GeocodingResult:
-        """Steps 1 to 5 for one event."""
-        sector_ref = self.sector_reference(event, k_prev)
+    def resolve_event(self, event: CrashEvent, gis_db: GisDatabase) -> GeocodingResult:
+        """Steps 1 to 5 for one event (no dependence on other records)."""
+        sector_ref = self.sector_reference(event)
         sector_point = sector_ref.coords if sector_ref is not None else None
 
         post = gis_db.resolve_pk_post(event.route, event.pk_marker, sector_point)
@@ -234,32 +236,13 @@ class DSDAEngine:
         self,
         events: Sequence[CrashEvent],
         gis_db: GisDatabase,
-        sort_chronologically: bool = True,
     ) -> List[GeocodingResult]:
-        """Process a corridor. Chronological order matters only for the
-        sector reference (fallback mode); LRS-anchored results are
-        order-independent."""
-        if not events:
-            return []
-        ordered = list(events)
-        if sort_chronologically and all(e.timestamp is not None for e in ordered):
-            ordered.sort(key=lambda e: e.timestamp)  # type: ignore[arg-type]
+        """Process a corridor record by record (stateless, results in input order)."""
+        return [self.resolve_event(event, gis_db) for event in events]
 
-        results: List[GeocodingResult] = []
-        k_prev: Optional[Anchor] = None
-        for event in ordered:
-            result = self.resolve_event(event, gis_db, k_prev)
-            results.append(result)
-            # Anchor independence: only accepted events update k_prev
-            if result.is_safe_anchor and result.selected_node is not None:
-                k_prev = Anchor(
-                    coords=result.selected_node.coords,
-                    anchor_type=AnchorType.PRIOR_EVENT,
-                    source_id=event.event_id,
-                    timestamp=event.timestamp,
-                    route=event.route,
-                )
-        return results
+
+def _ranking_key(c: CandidateEvaluation):
+    return (-c.cs_score, c.distance_m, c.node.node_name)
 
 
 def _norm(route: Optional[str]) -> str:

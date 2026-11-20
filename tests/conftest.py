@@ -2,7 +2,7 @@
 
 The single-event example (PK 34 on RR27) is the illustrative case drawn in
 Figure 3 of the manuscript: four synthetic candidate nodes around the nominal
-PK 34 post k_PK = (500000, 3700000), landmark "Hydraulic bridge (PK 34)".
+PK 34 post k_PK = (500000, 3700000), landmark "Hydraulic bridge (Maamoura)".
 """
 
 import pytest

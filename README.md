@@ -21,18 +21,15 @@ with standard weights $w_1 = 0.500$, $w_2 = 0.375$, $w_3 = 0.125$ and acceptance
 
 ---
 
-## 2. Algorithm 1, step by step
+## 2. Algorithm 1, step by step (stateless)
 
-1. **Sector reference** (used only when the PK marker is omitted or ambiguous):
-   - $k_{\text{prev}}$ uninitialized or route change: $k_{\text{municipality}}$;
-   - $\Delta t \leq 24$ h since the last accepted record on the route: $k_{\text{municipality}}$;
-   - otherwise: $k_{\text{prev}}$ (last accepted record).
+1. **Sector reference**: `sector_ref <- k_municipality`. No state is carried from one record to the next, so every result is independent of processing order and of the other records.
 2. **Candidate generation**
-   - **Primary LRS-anchored mode** (PK marker resolved on the route): the active anchor is the nominal PK post $k_{\text{PK}}$; candidates are all nodes within $R_{\max} = 500$ m of $k_{\text{PK}}$ (nodes of other routes included, their topology score is 0); base weights $(0.500, 0.375, 0.125)$. This mode is independent of record order.
-   - **Fallback mode** (PK omitted, unknown, or shared by several chainages without a sector reference): no proximity anchor; candidates are the route nodes in the active sector; base weights $(0.875, 0.000, 0.125)$.
+   - **Primary LRS-anchored mode** (PK marker resolved on the route; an ambiguous label is resolved with `sector_ref`): the active anchor is the nominal PK post $k_{\text{PK}}$; candidates are all nodes within $R_{\max} = 500$ m of $k_{\text{PK}}$ (nodes of other routes included, their topology score is 0); base weights $(0.500, 0.375, 0.125)$.
+   - **Fallback mode** (PK omitted or unresolved): no proximity anchor; candidates are the route nodes in the municipal sector; $w_2$ is transferred to toponymy, giving $(0.875, 0.000, 0.125)$.
 3. **Proximity decay** to $k_{\text{PK}}$ ($\sigma = 150$ m).
 4. **Intersection pass**: if `intersection_descriptors` is set, $w_1 \leftarrow w_1 + w_3$ and $w_3 \leftarrow 0$.
-5. **Acceptance gate**: the best candidate is accepted if $C_s \geq 0.85$; only accepted records update $k_{\text{prev}}$ (anchor independence). Rejected records go to manual review.
+5. **Deterministic selection and gate**: candidates are ranked by highest $C_s$, then smallest distance $d$ to $k_{\text{PK}}$ ($d = 0$ for all candidates in fallback mode), then lexicographic `Node_ID`; the first one is accepted if $C_s \geq 0.85$, otherwise the record goes to manual review.
 
 **Ground truth is never used at runtime.** `CrashEvent` has no ground-truth field and the engine does not read RTK-DGPS coordinates. Positional accuracy ($E_{\text{geo}}$, median, P90, P95, RMSE) is computed afterwards with `dsda.evaluation.compute_geocoding_accuracy`, for accepted records (conditional) and for all records using the top-ranked candidate (inclusive).
 
@@ -48,10 +45,17 @@ dsda/
 ├── gis_store.py    # Centerline nodes, nominal PK posts, radius and sector queries
 ├── engine.py       # DSDAEngine (Algorithm 1) and single-event entry point
 └── evaluation.py   # Post-hoc accuracy against ground truth (E_geo, P90, P95, RMSE)
+scripts/
+├── run_ablation.py          # Table D.2: component ablation (4 configurations + full model)
+└── table_f3_poisson_snr.py  # Table F.3: scan-window SNR and 95% Poisson bands (seed 2026)
+data/
+├── rr27_table_f2.csv        # Per-PK counts of Table F.2 (30-crash subset)
+└── example_synthetic/       # Synthetic files documenting the ablation input format
 tests/
 ├── conftest.py            # Fixtures (Figure 3 example, synthetic corridor)
 ├── test_metrics.py        # Similarity functions and weights
-├── test_anchor_rules.py   # LRS-anchored mode, sector rules, intersection pass, no runtime ground truth
+├── test_anchor_rules.py   # LRS-anchored mode, statelessness, tie-breaking, intersection pass, no runtime ground truth
+├── test_ablation_script.py # Ablation script on the synthetic example
 ├── test_engine.py         # GIS queries, summaries, sigma sensitivity
 ├── test_evaluation.py     # Post-hoc accuracy and percentiles
 └── test_poc_parity.py     # Values of Figure 3 (panel c)
@@ -83,7 +87,7 @@ nodes = [
 
 result = dsda_algorithm_with_logs(
     pk_marker="PK34",
-    t_rep="Hydraulic bridge (PK 34)",
+    t_rep="Hydraulic bridge (Maamoura)",
     target_route="RR27",
     k_pk={"x": 500000, "y": 3700000},   # nominal coordinate of the PK 34 post
     gis_database=nodes,
@@ -114,7 +118,21 @@ print(report.acceptance_rate, report.conditional, report.inclusive)
 
 ---
 
-## 6. Tests
+## 6. Reproducing Tables D.2 and F.3
+
+```bash
+# Table D.2 (needs the corridor files described in the script header)
+python scripts/run_ablation.py --data path/to/rr27 --out ablation_out
+
+# Table F.3 (10,000 draws, seed 2026)
+python scripts/table_f3_poisson_snr.py
+```
+
+The ablation input files (GIS nodes with gazetteer names, nominal PK posts, MLLM outputs, RTK-DGPS ground truth) are not distributed with the repository; `data/example_synthetic/` only documents their format.
+
+---
+
+## 7. Tests
 
 ```bash
 pytest -v

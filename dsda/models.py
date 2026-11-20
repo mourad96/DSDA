@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -84,12 +84,10 @@ class AnchorType(str, Enum):
     """Source classification of a spatial reference point.
 
     PK_POST is the only anchor used for proximity decay (primary LRS-anchored
-    mode, Algorithm 1). MUNICIPALITY_CENTROID and PRIOR_EVENT are sector
-    references, used only to resolve an omitted or ambiguous PK marker.
+    mode, Algorithm 1). MUNICIPALITY_CENTROID is the stateless sector
+    reference, used only to resolve an omitted or ambiguous PK marker.
     """
-    COLD_START = "COLD_START"
     PK_POST = "PK_POST"
-    PRIOR_EVENT = "PRIOR_EVENT"
     MUNICIPALITY_CENTROID = "MUNICIPALITY_CENTROID"
 
 
@@ -101,7 +99,7 @@ class ResolutionMode(str, Enum):
 
 @dataclass(frozen=True)
 class Anchor:
-    """Spatial reference point (k_PK, k_municipality or k_prev)."""
+    """Spatial reference point (k_PK or k_municipality)."""
     coords: Point2D
     anchor_type: AnchorType
     source_id: Optional[str] = None
@@ -167,7 +165,7 @@ class GeocodingResult:
     anchor_used: Optional[Anchor]
     mode: ResolutionMode = ResolutionMode.LRS_ANCHORED
     sector_reference: Optional[Anchor] = None
-    is_safe_anchor: bool = False
+    accepted: bool = False
     decision_message: str = ""
 
     def summary_table(self) -> str:
@@ -194,15 +192,10 @@ class GeocodingResult:
 @dataclass
 class DSDAParameters:
     """Configurable weights, tolerances, and thresholds for the DSDA algorithm."""
-    # Standard multi-criteria weights (Equation A1)
+    # Base weights of the primary LRS-anchored mode (Equation A1)
     w1: float = 0.500
     w2: float = 0.375
     w3: float = 0.125
-
-    # Cold start weights (Rule 1: Proximity neutralized, w2 absorbed by w1)
-    cold_start_w1: float = 0.875
-    cold_start_w2: float = 0.000
-    cold_start_w3: float = 0.125
 
     # Gaussian proximity bandwidth (Equation A3)
     sigma: float = 150.0
@@ -217,16 +210,26 @@ class DSDAParameters:
     # choice: Algorithm 1 does not fix it numerically)
     sector_radius: float = 5000.0
 
-    # Chronological sector rule: Delta_t <= 24 h -> k_municipality
-    simultaneous_window: timedelta = timedelta(hours=24)
+    # Fallback policy when the PK marker is omitted or unresolved:
+    #   "transfer": w2 is transferred to toponymy (w1 <- w1 + w2, w2 <- 0),
+    #               i.e. (0.875, 0.000, 0.125) with the base weights;
+    #   "reject":   the record is not scored and goes to manual review
+    #               (used for the PK-only ablation baseline, which has no
+    #               toponymic or topological component to fall back on).
+    fallback_policy: str = "transfer"
+
+    def fallback_weights(self) -> Dict[str, float]:
+        """Weights of the fallback mode (Algorithm 1, step 2)."""
+        if self.fallback_policy == "reject":
+            return {"w1": 0.0, "w2": 0.0, "w3": 0.0}
+        return {"w1": self.w1 + self.w2, "w2": 0.0, "w3": self.w3}
 
     def __post_init__(self) -> None:
+        if min(self.w1, self.w2, self.w3) < 0:
+            raise ValueError("Weights must be non-negative")
         std_sum = self.w1 + self.w2 + self.w3
         if not math.isclose(std_sum, 1.0, rel_tol=1e-3):
             raise ValueError(f"Standard weights must sum to 1.0, got {std_sum}")
-        cold_sum = self.cold_start_w1 + self.cold_start_w2 + self.cold_start_w3
-        if not math.isclose(cold_sum, 1.0, rel_tol=1e-3):
-            raise ValueError(f"Cold start weights must sum to 1.0, got {cold_sum}")
         if self.sigma <= 0:
             raise ValueError(f"Bandwidth sigma must be strictly positive, got {self.sigma}")
         if not (0.0 <= self.validation_threshold <= 1.0):
@@ -235,3 +238,5 @@ class DSDAParameters:
             raise ValueError(f"r_max must be strictly positive, got {self.r_max}")
         if self.sector_radius <= 0:
             raise ValueError(f"sector_radius must be strictly positive, got {self.sector_radius}")
+        if self.fallback_policy not in {"transfer", "reject"}:
+            raise ValueError(f"fallback_policy must be 'transfer' or 'reject', got {self.fallback_policy}")

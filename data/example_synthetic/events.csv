@@ -1,0 +1,7 @@
+event_id,route,pk_marker,landmarks,intersection,muni_x,muni_y
+S01,RR27,PK34,Hydraulic bridge (Maamoura),0,500050,3700020
+S02,RR27,PK33,Maamoura Sud,0,500050,3700020
+S03,RR27,PK35,El Mazraa Nord,0,500050,3700020
+S04,RR27,PK34,RR43 junction,1,500050,3700020
+S05,RR27,,Hydraulic bridge,0,500050,3700020
+S06,RR27,PK34,Unknown landmark,0,500050,3700020
