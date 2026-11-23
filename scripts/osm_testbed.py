@@ -958,8 +958,8 @@ def run(osm_path: Path, registry_path: Path, out: Path, replicates: int = REPLIC
     _table5(out, agg, n, replicates)
     _table_c1(out, agg, pooled_cond, pooled_incl, n, replicates)
     write_table(out / "tableC2_testbed",
-                ["Record", "Recorded PK", "Simulated true PK", "Mode", "Cs (best)", "Best-candidate E_geo (m)",
-                 "Distance truth to PK post (m)", "Injected degradations / structural causes"], c2_rows,
+                ["Record", "PK in simulated report", "Simulated true PK", "Mode", "Cs (best)", "Best-candidate E_geo (m)",
+                 "Distance truth to registry PK post (m)", "Injected degradations / structural causes"], c2_rows,
                 f"Scenario {REFERENCE_SCENARIO}, replicate 0 (seed {BASE_SEED}); Full DSDA; records not "
                 f"accepted by the gate Cs >= 0.85. Causes are known by construction.")
     _table_d2(out, agg, muni_base, n, replicates)
