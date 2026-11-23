@@ -19,6 +19,9 @@ dependencies = [
 dev = [
     "pytest>=7.0.0",
 ]
+testbed = [
+    "numpy", "pandas", "openpyxl", "networkx", "scipy", "pyproj", "shapely",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

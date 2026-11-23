@@ -1,6 +1,6 @@
 """Post-hoc positional accuracy of DSDA outputs (E_geo, median, P90, P95, RMSE).
 
-Ground-truth coordinates (RTK-DGPS) are read only here, after the engine has
+Ground-truth coordinates (surveyed or simulated) are read only here, after the engine has
 produced its decisions. Nothing in this module feeds back into dsda.engine.
 
 Two populations are reported, as in Table 5 / Table C.1:
@@ -75,7 +75,7 @@ def compute_geocoding_accuracy(
 
     Args:
         results: Engine outputs (decisions already taken).
-        ground_truth: event_id -> RTK-DGPS coordinate (same projected CRS).
+        ground_truth: event_id -> reference coordinate (same projected CRS).
     """
     per_record: List[Dict[str, object]] = []
     missing: List[str] = []

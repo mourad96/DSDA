@@ -17,7 +17,7 @@ Input files (UTF-8 CSV, projected coordinates in metres, e.g. UTM 32N):
   events.csv        event_id, route, pk_marker, landmarks, intersection[, muni_x, muni_y]
                     (pk_marker empty if omitted; landmarks separated by '|';
                      intersection 0/1; columns = MLLM output, not the registry)
-  ground_truth.csv  event_id, x, y        (RTK-DGPS, used post hoc only)
+  ground_truth.csv  event_id, x, y        (reference positions, used post hoc only)
 
 Usage:
   python scripts/run_ablation.py --data DIR [--out DIR]

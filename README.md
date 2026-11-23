@@ -31,7 +31,7 @@ with standard weights $w_1 = 0.500$, $w_2 = 0.375$, $w_3 = 0.125$ and acceptance
 4. **Intersection pass**: if `intersection_descriptors` is set, $w_1 \leftarrow w_1 + w_3$ and $w_3 \leftarrow 0$.
 5. **Deterministic selection and gate**: candidates are ranked by highest $C_s$, then smallest distance $d$ to $k_{\text{PK}}$ ($d = 0$ for all candidates in fallback mode), then lexicographic `Node_ID`; the first one is accepted if $C_s \geq 0.85$, otherwise the record goes to manual review.
 
-**Ground truth is never used at runtime.** `CrashEvent` has no ground-truth field and the engine does not read RTK-DGPS coordinates. Positional accuracy ($E_{\text{geo}}$, median, P90, P95, RMSE) is computed afterwards with `dsda.evaluation.compute_geocoding_accuracy`, for accepted records (conditional) and for all records using the top-ranked candidate (inclusive).
+**Ground truth is never used at runtime.** `CrashEvent` has no ground-truth field and the engine does not read reference coordinates. Positional accuracy ($E_{\text{geo}}$, median, P90, P95, RMSE) is computed afterwards with `dsda.evaluation.compute_geocoding_accuracy`, for accepted records (conditional) and for all records using the top-ranked candidate (inclusive).
 
 ---
 
@@ -128,7 +128,25 @@ python scripts/run_ablation.py --data path/to/rr27 --out ablation_out
 python scripts/table_f3_poisson_snr.py
 ```
 
-The ablation input files (GIS nodes with gazetteer names, nominal PK posts, MLLM outputs, RTK-DGPS ground truth) are not distributed with the repository; `data/example_synthetic/` only documents their format.
+`data/example_synthetic/` documents the format of the ablation input files (GIS nodes with gazetteer names, nominal PK posts, report fields, ground truth).
+
+### Controlled testbed on the OpenStreetMap graph (Tables 5, C.1, C.2, D.2)
+
+No surveyed crash positions exist for RR27 or RN15. DSDA is therefore evaluated on a
+simulation testbed built on the real OpenStreetMap road graph of RR27, with true positions
+drawn inside each record's recorded PK interval. The protocol (`testbed/PROTOCOL.md`, v1.0)
+was frozen before any real extract was loaded; results are reported whatever they are.
+
+```bash
+pip install pyproj shapely scipy openpyxl pandas networkx   # plus osmium for a .pbf
+# OSM extract: run testbed/overpass_query.overpassql in overpass-turbo.eu, export raw OSM data (JSON)
+python scripts/osm_testbed.py --osm export.json --registry BD_RR27F.xlsx --out testbed_out
+```
+
+Outputs: `table5_testbed`, `tableC1_testbed`, `tableC2_testbed`, `tableD2_testbed` (CSV and
+Markdown), `manifest.json` (OSM timestamp, file hashes, seeds, anchors), `qa_report.md`, and the
+input files of scenario S1 replicate 0 with the output of `scripts/run_ablation.py` on them.
+The registry itself is not distributed; only its PK and coded-cause fields are read.
 
 ---
 

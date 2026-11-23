@@ -3,7 +3,7 @@
 Regenerated with `pytest -v` after making the engine stateless (Algorithm 1, Appendix A.2, manuscript of 19 November 2026).
 
 - Python 3.13.18
-- Result: **50 passed in 0.07s**
+- Result: **55 passed** (50 DSDA tests plus 5 testbed tests)
 
 ## What the suite checks
 
@@ -14,6 +14,7 @@ Regenerated with `pytest -v` after making the engine stateless (Algorithm 1, App
 | Engine and GIS store | `test_engine.py` | PK normalization, PK post resolution, radius queries, summaries, stability for $\sigma \in [100, 250]$ m |
 | Post-hoc accuracy | `test_evaluation.py` | Linear-interpolated percentiles (P90, P95), conditional vs inclusive populations, decisions unchanged by ground truth |
 | Ablation script | `test_ablation_script.py` | Five rows produced; full-model row identical to a direct run; PK-only baseline rejects records without PK (synthetic data) |
+| OSM testbed | `test_osm_testbed.py` | On an invented OSM fixture: five anchors found and inverted exactly; true positions inside the recorded PK interval; scenarios nested (S0 none, S1 within S2); deterministic full pass; `run_ablation.py` reproduces the in-process counts |
 | Figure 3 | `test_poc_parity.py` | Panel (c) values for $T_{rep}$ = "Hydraulic bridge (Maamoura)" |
 
 ## Figure 3 reproduction (`python example_usage.py`)
@@ -29,7 +30,7 @@ Anchor = PK 34 post. Synthetic, illustrative test case: the gazetteer strings an
 
 ## Scope
 
-These tests verify the implementation on synthetic data. They do not reproduce the corridor results of the manuscript (RR27, RN15), which require the GIS layers, the MLLM outputs and the RTK-DGPS ground truth.
+These tests verify the implementation on synthetic data. They do not reproduce the corridor results of the manuscript (RR27, RN15), which would require surveyed crash positions; no such survey exists. The OSM testbed (`testbed/PROTOCOL.md`) evaluates DSDA on simulated positions instead.
 
 ## Detailed results
 
