@@ -39,13 +39,16 @@ def corridor(inputs):
     return c, registry
 
 
-def test_calibration_uses_all_five_anchors(corridor):
+def test_calibration_is_unit_scale_from_beni_khiar(corridor):
     c, _ = corridor
-    assert [a["pk"] for a in c.anchors] == [27.0, 31.24, 33.08, 33.56, 36.3]
-    pk, s = c.pk_s
-    for p, x in zip(pk, s):
-        assert c.pk_of_s(x) == pytest.approx(p)
-        assert c.s_of_pk(p) == pytest.approx(x)
+    assert sorted(a["pk"] for a in c.anchors) == [27.0, 31.24, 33.08, 33.56, 36.3]
+    origin = [a for a in c.anchors if a["role"] == "origin"]
+    assert len(origin) == 1 and origin[0]["pk"] == 27.0
+    s0 = origin[0]["s"]
+    assert c.pk_of_s(s0) == pytest.approx(27.0)
+    assert c.pk_of_s(s0 + 1000.0) == pytest.approx(28.0)
+    assert c.s_of_pk(43.5) == pytest.approx(s0 + 16500.0)
+    assert all(a["role"].startswith("check") for a in c.anchors if a is not origin[0])
 
 
 def test_true_positions_stay_in_recorded_pk_interval(corridor):

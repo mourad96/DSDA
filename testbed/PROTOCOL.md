@@ -1,9 +1,33 @@
 # DSDA controlled geospatial testbed on the OpenStreetMap graph (RR27)
 
-Protocol version 1.0, frozen on 23 November 2026, before any real OpenStreetMap
-extract was loaded. Implementation: `scripts/osm_testbed.py` (constants in its
+Protocol version 1.1. Version 1.0 was frozen on 23 November 2026, before any
+real OpenStreetMap extract was loaded; version 1.1 (section 0) amends only the
+PK calibration, on the same day, after inspection of the extract and before any
+DSDA run on it. Implementation: `scripts/osm_testbed.py` (constants in its
 PROTOCOL block mirror this document). Any later change requires a new version
 number, and the change and its reason are reported with the results.
+
+## 0. Amendment 1.1 (PK calibration)
+
+Quality checks on the extract (OSM base timestamp 2026-11-23T20:02:34Z) showed
+that the anchors of section 3 cannot all be located on OSM:
+
+- Maamoura PK 31+240: the village place node lies 1.47 km from the RR27
+  centerline; its projection falls 1.6 km from Beni Khiar, which would imply
+  2.66 PK-km per km of road (QA range 0.80 to 1.25).
+- El Mazraa PK 36+300: no OSM element of that name exists.
+- Hydraulic structures PK 33+080 and 33+560: a single structure (stream bridge)
+  lies on the centerline in that sector.
+
+Applying section 3 unchanged would compress each PK kilometre into about 376 m
+of road, placing simulated crashes artificially close to their posts and
+inflating acceptance. Version 1.1 therefore replaces items 3 and 4 of section 3:
+PK = 27.000 + (s - s_BK) / 1000, where s_BK is the projection of the Beni Khiar
+place node (7 m from the centerline), i.e. one PK kilometre per kilometre of
+road, which is the definition of a kilometric point. The other four anchors are
+kept as checks: their unit-scale PK and discrepancy are reported in
+`qa_report.md`. Beyond this calibration rule nothing else changes. The choice
+was made by the authors without any DSDA output on the extract.
 
 ## 1. Purpose and status
 
@@ -58,6 +82,8 @@ seen.
    0.80 to 1.25 PK-km per OSM-km are flagged. A non-monotone calibration stops
    the run.
 5. Nominal posts k_PK: integer PKs 26 to 44 placed at s(PK).
+
+Items 3 and 4 above are the version 1.0 rule, replaced by section 0 in version 1.1.
 
 ## 4. GIS layer seen by DSDA
 
@@ -131,7 +157,7 @@ Cs = 1 at any distance.
 ## 8. Limitations
 
 Simulated positions and reports; OSM completeness and naming as of the
-extraction date; PK extrapolation beyond El Mazraa; municipality approximated
+extraction date; PK calibration on a single origin with unit scale (v1.1); municipality approximated
 by the nearest place; uniform position within the PK interval; degradation
 rates assumed. The testbed says nothing about real positional accuracy on
 RR27 or RN15.

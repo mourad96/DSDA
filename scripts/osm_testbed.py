@@ -84,7 +84,7 @@ import run_ablation  # noqa: E402
 # ======================================================================
 # PROTOCOL (fixed by testbed/PROTOCOL.md; do not change after data loading)
 # ======================================================================
-PROTOCOL_VERSION = "1.0"
+PROTOCOL_VERSION = "1.1"
 CRS = "EPSG:32632"                      # WGS 84 / UTM zone 32N
 ROUTE = "RR27"
 ROUTE_REF = r"^(RR|MC|C|RL|R)\s*-?\s*27$"  # OSM ref values identifying the route
@@ -96,6 +96,8 @@ ANCHORS: List[Tuple[float, str, Tuple[str, ...]]] = [
     (36.300, "place", ("mazraa",)),
 ]
 HYDRAULIC_SEARCH_M = 300.0     # max distance between predicted and OSM structure
+ORIGIN_PK = 27.000             # v1.1: Beni Khiar, origin of the unit-scale calibration
+UNIT_SCALE = 0.001             # v1.1: PK-km per metre of centerline
 SCALE_FLAG = (0.80, 1.25)      # QA flag on PK km per OSM km between anchors
 PK_HALF_WIDTH_KM = 0.5         # integer PK n -> true PK ~ U[n - 0.5, n + 0.5)
 FEATURE_BUFFER_M = 700.0       # named features kept within this distance of RR27
@@ -412,13 +414,13 @@ def calibrate(c: Corridor, data: OsmData) -> None:
             if best is None or d < best[0]:
                 best = (d, i, report_name(tags), x, y)
         if best is None:
-            c.qa.append(f"Anchor PK {pk:.3f} ({keys[0]}): no OSM place found, anchor dropped.")
+            c.qa.append(f"Check anchor PK {pk:.3f} ({keys[0]}): no OSM place of that name.")
             continue
         s = c.line.project(Point(best[3], best[4]))
         found.append({"pk": pk, "kind": "place", "osm": f"node/{best[1]}", "name": best[2],
                       "offset_m": round(best[0], 1), "s": s})
     if len(found) < 2:
-        raise SystemExit("Fewer than two place anchors found: PK calibration impossible.")
+        raise SystemExit("Fewer than two place anchors found: chainage orientation impossible.")
     found.sort(key=lambda a: a["pk"])
     if found[-1]["s"] < found[0]["s"]:   # orient chainage along increasing PK
         coords = list(c.line.coords)[::-1]
@@ -451,37 +453,48 @@ def calibrate(c: Corridor, data: OsmData) -> None:
         if merged and s - merged[-1][0] < 30.0:
             continue
         merged.append((s, ref, nm))
-    pk0 = np.array([a["pk"] for a in found])
-    s0 = np.array([a["s"] for a in found])
+    # Protocol v1.1 (amendment of 23 November 2026, before any DSDA run): the
+    # authors' anchors could not all be located on OSM (see PROTOCOL.md, section 0).
+    # Calibration = origin anchor + unit scale (1 PK-km = 1 km along the RR27
+    # centerline); the other anchors are reported as checks only.
+    origin = next((a for a in found if a["pk"] == ORIGIN_PK), None)
+    if origin is None:
+        raise SystemExit(f"Origin anchor PK {ORIGIN_PK:.3f} not found on OSM: protocol v1.1 stops here.")
+    c.pk_s = (np.array([origin["pk"]]), np.array([origin["s"]]))
+    c.slope = UNIT_SCALE
+    origin["role"] = "origin"
+    c.anchors = [origin]
+    for a in found:
+        if a is origin:
+            continue
+        implied = c.pk_of_s(a["s"])
+        a["role"] = "check"
+        a["implied_pk"] = implied
+        ratio = (a["pk"] - ORIGIN_PK) / ((a["s"] - origin["s"]) / 1000.0) if a["s"] != origin["s"] else float("inf")
+        flag = "" if SCALE_FLAG[0] <= ratio <= SCALE_FLAG[1] else "  << outside QA range"
+        c.qa.append(f"Check anchor PK {a['pk']:.3f} ({a['name']}, {a['offset_m']:.0f} m from RR27): "
+                    f"unit-scale PK at its projection {implied:.3f} (difference {implied - a['pk']:+.3f} km); "
+                    f"ratio to origin {ratio:.3f} PK-km per OSM-km{flag}.")
+        c.anchors.append(a)
     used = set()
     for pk, kind, _ in ANCHORS:
         if kind != "hydraulic":
             continue
-        pred = float(np.interp(pk, pk0, s0))
-        options = [(abs(s - pred), s, ref, nm) for s, ref, nm in merged if ref not in used and abs(s - pred) <= HYDRAULIC_SEARCH_M]
+        pred = c.s_of_pk(pk)
+        options = sorted((abs(sv - pred), sv, ref, nm) for sv, ref, nm in merged if ref not in used)
         if not options:
-            c.qa.append(f"Anchor PK {pk:.3f} (hydraulic structure): none within {HYDRAULIC_SEARCH_M:.0f} m "
-                        f"of the predicted chainage, anchor dropped.")
+            c.qa.append(f"Check anchor PK {pk:.3f} (hydraulic structure): no OSM structure on the centerline.")
             continue
-        _, s, ref, nm = min(options)
-        used.add(ref)
-        found.append({"pk": pk, "kind": "hydraulic", "osm": ref, "name": nm,
-                      "offset_m": round(abs(s - pred), 1), "s": s})
-    found.sort(key=lambda a: a["pk"])
-    ss = [a["s"] for a in found]
-    if any(b <= a for a, b in zip(ss, ss[1:])):
-        bad = [f"{a['pk']:.3f}" for a, b in zip(found, found[1:]) if b["s"] <= a["s"]]
-        raise SystemExit(f"Non-monotone PK calibration at anchors {bad}: protocol section 3 stops here.")
-    pk = np.array([a["pk"] for a in found])
-    s = np.array(ss)
-    c.anchors = found
-    c.pk_s = (pk, s)
-    c.slope = float(np.polyfit(s, pk, 1)[0])
-    for a, b in zip(found, found[1:]):
-        ratio = (b["pk"] - a["pk"]) / ((b["s"] - a["s"]) / 1000.0)
-        flag = "" if SCALE_FLAG[0] <= ratio <= SCALE_FLAG[1] else "  << outside QA range"
-        c.qa.append(f"PK {a['pk']:.3f} -> {b['pk']:.3f}: {ratio:.3f} PK-km per OSM-km{flag}")
-    c.qa.append(f"Least-squares slope used outside the anchors: {c.slope * 1000:.4f} PK-km per OSM-km.")
+        dist, sv, ref, nm = options[0]
+        within = dist <= HYDRAULIC_SEARCH_M
+        if within:
+            used.add(ref)
+        c.qa.append(f"Check anchor PK {pk:.3f} (hydraulic structure): nearest OSM structure {ref} at unit-scale PK "
+                    f"{c.pk_of_s(sv):.3f} ({dist:.0f} m{'' if within else ', beyond the 300 m tolerance'}).")
+        c.anchors.append({"pk": pk, "kind": "hydraulic", "osm": ref, "name": nm, "offset_m": round(dist, 1),
+                          "s": sv, "role": "check" if within else "check (not matched)",
+                          "implied_pk": c.pk_of_s(sv)})
+    c.qa.append(f"Calibration (protocol v1.1): PK = {ORIGIN_PK:.3f} + (s - {origin['s']:.1f} m) / 1000.")
 
 
 def build_gis(c: Corridor, data: OsmData) -> None:
@@ -980,9 +993,9 @@ def run(osm_path: Path, registry_path: Path, out: Path, replicates: int = REPLIC
     (out / "qa_report.md").write_text(
         "# Testbed QA report\n\n"
         + "\n".join(f"- {q}" for q in c.qa)
-        + "\n\n## Calibration anchors\n\n| PK | Kind | OSM element | Name | Offset (m) | Chainage (m) |\n|---|---|---|---|---|---|\n"
-        + "\n".join(f"| {a['pk']:.3f} | {a['kind']} | {a['osm']} | {a['name'] or ''} | {a['offset_m']} | {a['s']:.1f} |"
-                    for a in c.anchors)
+        + "\n\n## Calibration anchors (protocol v1.1)\n\n| PK | Kind | Role | OSM element | Name | Offset (m) | Chainage (m) | Unit-scale PK |\n|---|---|---|---|---|---|---|---|\n"
+        + "\n".join(f"| {a['pk']:.3f} | {a['kind']} | {a.get('role', '')} | {a['osm']} | {a['name'] or ''} | {a['offset_m']} "
+                    f"| {a['s']:.1f} | {a.get('implied_pk', a['pk']):.3f} |" for a in c.anchors)
         + f"\n\n## Structural properties of the simulated corpus (mean [2.5, 97.5] over {replicates} replicates)\n\n"
         + f"- Records without any named feature within {LANDMARK_RADIUS_M:.0f} m of the true position: "
         + fmt(manifest["structural"]["no_landmark"]) + f" of {n}\n"
