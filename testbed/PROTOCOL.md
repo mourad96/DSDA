@@ -1,9 +1,11 @@
 # DSDA controlled geospatial testbed on the OpenStreetMap graph (RR27)
 
-Protocol version 1.1. Version 1.0 was frozen on 23 November 2026, before any
+Protocol version 1.2. Version 1.0 was frozen on 23 November 2026, before any
 real OpenStreetMap extract was loaded; version 1.1 (section 0) amends only the
 PK calibration, on the same day, after inspection of the extract and before any
-DSDA run on it. Implementation: `scripts/osm_testbed.py` (constants in its
+DSDA run on it; version 1.2 (section 0b) amends only the intersection
+indicator, on 26 November 2026, after a factual error was found in the
+registry reading. Results of version 1.1 are kept as a sensitivity analysis. Implementation: `scripts/osm_testbed.py` (constants in its
 PROTOCOL block mirror this document). Any later change requires a new version
 number, and the change and its reason are reported with the results.
 
@@ -28,6 +30,21 @@ road, which is the definition of a kilometric point. The other four anchors are
 kept as checks: their unit-scale PK and discrepancy are reported in
 `qa_report.md`. Beyond this calibration rule nothing else changes. The choice
 was made by the authors without any DSDA output on the extract.
+
+## 0b. Amendment 1.2 (intersection indicator)
+
+Version 1.1 treated every record of the coded cause category "Non respect
+priorite, feux, stop" (selectin = 1, 31 of 83 records) as an intersection
+crash. The detailed cause field of the registry shows that this category
+groups four manoeuvres: failure to keep right (16 records), illegal overtaking
+(6), improper change of direction (5) and right-of-way violation (4). Failure
+to keep right and overtaking crashes are not junction crashes. Version 1.2
+therefore reads the intersection indicator from the detailed cause: a record is
+an intersection crash when its detailed cause is "Non respect priorite" or
+"Changement de direction" (9 of 83 records). This changes only which records
+are placed at junctions and carry the intersection flag; every other rule,
+parameter, seed and scenario is unchanged. The amendment follows from the
+registry content, not from the v1.1 results; both result sets are reported.
 
 ## 1. Purpose and status
 
@@ -55,10 +72,11 @@ seen.
   `.osm.pbf` cropped to the same box is accepted. The file SHA-256 and the OSM
   base timestamp are written to `manifest.json`.
 - Registry: sheet MC27 of the RR27 workbook. Fields used: `PK` (integer km)
-  and the coded cause. A record is an intersection crash when its coded cause is
-  "Non respect priorite, feux, stop" (right-of-way, signal or stop violation);
-  in the RR27 registry this is exactly the set flagged `selectin = 1` (31 of 83).
-  No other registry field enters the testbed.
+  and the detailed cause. Version 1.2: a record is an intersection crash when
+  its detailed cause is "Non respect priorite" or "Changement de direction"
+  (9 of 83; section 0b). Version 1.1 used the coded category "Non respect
+  priorite, feux, stop" (selectin = 1, 31 of 83). No other registry field
+  enters the testbed.
 - Projection: WGS 84 / UTM zone 32N (EPSG:32632).
 
 ## 3. Route and PK calibration

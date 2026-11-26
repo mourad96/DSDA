@@ -84,7 +84,7 @@ import run_ablation  # noqa: E402
 # ======================================================================
 # PROTOCOL (fixed by testbed/PROTOCOL.md; do not change after data loading)
 # ======================================================================
-PROTOCOL_VERSION = "1.1"
+PROTOCOL_VERSION = "1.2"
 CRS = "EPSG:32632"                      # WGS 84 / UTM zone 32N
 ROUTE = "RR27"
 ROUTE_REF = r"^(RR|MC|C|RL|R)\s*-?\s*27$"  # OSM ref values identifying the route
@@ -599,37 +599,47 @@ def base_nodes(c: Corridor) -> List[dict]:
 # ----------------------------------------------------------------------
 # Registry and simulation
 # ----------------------------------------------------------------------
-INTERSECTION_CAUSE = "non respect priorite feux stop"   # right-of-way, signal or stop violation
+# Protocol v1.2 (amendment of 26 November 2026): the intersection indicator is
+# read from the detailed cause field ("Causes"). Right-of-way violations and
+# improper turning (change of direction) are junction manoeuvres; failure to
+# keep right and illegal overtaking are not, although the coded macro-category
+# "Non respect priorite, feux, stop" (selectin = 1) groups all four.
+INTERSECTION_CAUSES = {"non respect priorite", "changement de direction"}
+DETAILED_CAUSE_COL = "Causes"
+CODED_CAUSE_COL = "Causes codifi\u00e9es"
 
 
 def load_registry(path: Path, qa: Optional[List[str]] = None) -> List[Tuple[str, int, int]]:
     """Registry fields used: PK (integer) and the intersection indicator.
 
-    A record is an intersection crash when its coded cause is a right-of-way,
-    signal or stop violation ("Non respect priorite, feux, stop"); in the RR27
-    registry this is exactly the set flagged selectin = 1. Without a cause
-    column, selectin is used.
+    Protocol v1.2: a record is an intersection crash when its detailed cause is
+    a right-of-way violation ("Non respect priorite") or an improper change of
+    direction ("Changement de direction"). Without a detailed cause column,
+    selectin is used (synthetic fixtures only).
     """
     import pandas as pd
 
     df = pd.read_excel(path, sheet_name="MC27")
-    cause_col = "Causes codifi\u00e9es"
     out = []
-    agree = 0
+    by_cause: Dict[str, int] = {}
     for k, (_, rec) in enumerate(df.iterrows(), start=1):
-        sel = int(rec["selectin"]) if "selectin" in df.columns else None
-        if cause_col in df.columns:
-            flag = int(normalize_toponym(str(rec[cause_col])) == INTERSECTION_CAUSE)
-            agree += int(sel is not None and sel == flag)
+        if DETAILED_CAUSE_COL in df.columns:
+            cause = normalize_toponym(str(rec[DETAILED_CAUSE_COL]))
+            flag = int(cause in INTERSECTION_CAUSES)
+            if flag:
+                by_cause[cause] = by_cause.get(cause, 0) + 1
         else:
-            flag = int(sel)
+            flag = int(rec["selectin"])
         out.append((f"RR27-{k:03d}", int(rec["PK"]), flag))
     if qa is not None:
         n_int = sum(f for _, _, f in out)
-        msg = f"Registry: {len(out)} records, {n_int} intersection crashes"
-        if cause_col in df.columns and "selectin" in df.columns:
-            msg += f" (cause-based flag agrees with selectin on {agree}/{len(out)} records)"
-        qa.append(msg + ".")
+        msg = f"Registry: {len(out)} records, {n_int} intersection crashes (protocol v1.2"
+        if by_cause:
+            msg += ": " + ", ".join(f"{v} '{k}'" for k, v in sorted(by_cause.items()))
+        if "selectin" in df.columns:
+            n_sel = int((df["selectin"] == 1).sum())
+            msg += f"; selectin = 1 flags {n_sel} records, v1.1 treated all of them as intersection crashes"
+        qa.append(msg + ").")
     return out
 
 
