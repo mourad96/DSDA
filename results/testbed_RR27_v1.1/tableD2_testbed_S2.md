@@ -1,0 +1,10 @@
+| Configuration | Weights (w1, w2, w3) | Automated throughput (of 83) | Conditional mean E_geo (m) | Inclusive mean E_geo (m) | Conditional P90 (m) |
+|---|---|---|---|---|---|
+| Municipality centroid (address-level baseline) | -- | -- | -- | 1682.8 [1647.6, 1717.4] | -- |
+| Nominal LRS PK only (proximity baseline) | (0.000, 1.000, 0.000) | 40.2 [34.0, 45.0] | 303.2 [226.1, 385.9] | 335.1 [271.9, 404.7] | 563.4 [428.3, 990.6] |
+| Toponymy only (no proximity, no topology) | (1.000, 0.000, 0.000) | 16.1 [9.0, 23.0] | 143.0 [55.0, 314.1] | 656.1 [414.7, 945.6] | 319.2 [119.0, 778.5] |
+| Without topology (S_top + S_prox) | (0.571, 0.429, 0.000) | 6.8 [3.0, 12.0] | 189.8 [27.2, 570.1] (defined in 998/1000) | 667.2 [427.0, 958.5] | 410.9 [53.9, 1321.5] (defined in 998/1000) |
+| Without proximity (S_top + S_topo) | (0.800, 0.000, 0.200) | 12.3 [7.0, 18.0] | 156.5 [43.3, 406.3] | 654.8 [413.7, 941.7] | 361.7 [89.4, 993.9] |
+| Full DSDA | (0.500, 0.375, 0.125) | 6.5 [2.0, 11.0] | 198.4 [25.7, 598.7] (defined in 998/1000) | 666.1 [423.4, 953.6] | 421.4 [49.0, 1361.2] (defined in 998/1000) |
+
+Scenario S2. Mean over 1000 replicates [2.5th, 97.5th percentile].

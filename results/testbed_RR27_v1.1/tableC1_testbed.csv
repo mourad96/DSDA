@@ -1,0 +1,22 @@
+Metric,S1
+Panel A: accepted records (Cs >= 0.85),
+"Automated throughput (records, of 83)","9.3 [4.0, 14.0]"
+Conditional mean E_geo (m),"163.9 [51.0, 366.7]"
+Conditional median E_geo (m),"108.5 [11.6, 298.4]"
+Conditional P90 (m),"352.8 [111.4, 781.6]"
+Conditional P95 (m),"445.3 [141.4, 1176.3]"
+Accepted with E_geo > 150 m (records),"3.6 [1.0, 7.0]"
+Panel B: all records with a best candidate,
+Records with a best candidate,"83.0 [83.0, 83.0]"
+Inclusive mean E_geo (m),"456.0 [282.9, 680.3]"
+Inclusive P90 (m),"701.1 [533.4, 1139.5]"
+Inclusive P95 (m),"1440.9 [667.0, 4459.2]"
+Inclusive RMSE (m),"1005.0 [380.1, 1570.6]"
+Maximum E_geo (m),"5816.6 [1260.7, 7147.8]"
+Pooled distribution over all replicates,
+Share of E_geo in 0-25 m (accepted / inclusive),30.8% / 14.1%
+Share of E_geo in 25-50 m (accepted / inclusive),10.3% / 4.1%
+Share of E_geo in 50-100 m (accepted / inclusive),11.3% / 7.3%
+Share of E_geo in 100-150 m (accepted / inclusive),8.4% / 8.1%
+Share of E_geo in 150-300 m (accepted / inclusive),19.7% / 24.8%
+Share of E_geo in > 300 m (accepted / inclusive),19.6% / 41.7%

@@ -1,0 +1,6 @@
+Configuration,"Weights (w1, w2, w3)",Automated throughput,Conditional mean E_geo (m),Inclusive mean E_geo (m),Conditional P90 (m),Inclusive n,Conditional P95 (m),Inclusive RMSE (m)
+Nominal LRS PK only (proximity baseline),"(0.000, 1.000, 0.000)",44/83 (53.0%),269.0,268.2,488.3,77,534.4,349.3
+"Toponymy only (no proximity, no topology)","(1.000, 0.000, 0.000)",27/83 (32.5%),106.8,461.7,200.3,83,309.2,1102.1
+Without topology (S_top + S_prox),"(0.571, 0.429, 0.000)",14/83 (16.9%),99.8,481.6,297.4,83,370.9,1104.9
+Without proximity (S_top + S_topo),"(0.800, 0.000, 0.200)",20/83 (24.1%),110.3,463.5,279.2,83,364.2,1101.8
+Full DSDA,"(0.500, 0.375, 0.125)",14/83 (16.9%),99.8,480.7,297.4,83,370.9,1106.9

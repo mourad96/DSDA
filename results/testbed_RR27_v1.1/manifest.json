@@ -1,0 +1,103 @@
+{
+  "protocol_version": "1.1",
+  "run_utc": "2026-11-23T20:14:43+00:00",
+  "code_commit": "b8c1e0123c585038baa3e6c1c6120232f85a92c4",
+  "script_sha256": "622772391cde0e2e78fbe38df7700018c0effcf123a5232aba100ecc93b42d74",
+  "protocol_sha256": "295c284273d74034349337d6b8ababb8a786f7311797accbb38b25a015bd43e3",
+  "osm_file": "export.json",
+  "osm_sha256": "3f2ae7663bc88a4cd2f572e139cadaeba128548a1266557bf551ff37c863e5c5",
+  "osm_timestamp": "2026-11-23T20:02:34Z",
+  "registry_sha256": "9d7ffe65bf007c78f2f7400ecb264b3fadd307ca96c84b3d34426b0db628f4fd",
+  "records": 83,
+  "crs": "EPSG:32632",
+  "route_regex": "^(RR|MC|C|RL|R)\\s*-?\\s*27$",
+  "bbox": null,
+  "anchors": [
+    {
+      "pk": 27.0,
+      "kind": "place",
+      "osm": "node/1128018620",
+      "name": "Béni Khiar",
+      "offset_m": 6.8,
+      "s": 4463.02,
+      "role": "origin"
+    },
+    {
+      "pk": 31.24,
+      "kind": "place",
+      "osm": "node/1865629269",
+      "name": "Maâmoura",
+      "offset_m": 1470.2,
+      "s": 6054.88,
+      "role": "check",
+      "implied_pk": 28.59
+    },
+    {
+      "pk": 33.08,
+      "kind": "hydraulic",
+      "osm": "way/208559838 (waterway stream)",
+      "name": null,
+      "offset_m": 761.0,
+      "s": 11304.07,
+      "role": "check (not matched)",
+      "implied_pk": 33.84
+    },
+    {
+      "pk": 33.56,
+      "kind": "hydraulic",
+      "osm": "way/208559838 (waterway stream)",
+      "name": null,
+      "offset_m": 281.0,
+      "s": 11304.07,
+      "role": "check",
+      "implied_pk": 33.84
+    }
+  ],
+  "replicates": 1000,
+  "base_seed": 2026,
+  "scenarios": {
+    "S0": {
+      "p_omit": 0.0,
+      "p_sub": 0.0,
+      "p_typo": 0.0,
+      "p_pk_shift": 0.0,
+      "p_pk_missing": 0.0,
+      "p_flag": 0.0,
+      "p_gis_gap": 0.0
+    },
+    "S1": {
+      "p_omit": 0.15,
+      "p_sub": 0.05,
+      "p_typo": 0.25,
+      "p_pk_shift": 0.05,
+      "p_pk_missing": 0.05,
+      "p_flag": 0.05,
+      "p_gis_gap": 0.1
+    },
+    "S2": {
+      "p_omit": 0.3,
+      "p_sub": 0.1,
+      "p_typo": 0.5,
+      "p_pk_shift": 0.1,
+      "p_pk_missing": 0.1,
+      "p_flag": 0.1,
+      "p_gis_gap": 0.2
+    }
+  },
+  "reference_scenario": "S1",
+  "structural": {
+    "no_landmark": [
+      48.46,
+      44.0,
+      53.0,
+      1000
+    ],
+    "beyond_gate_radius": [
+      59.394,
+      52.0,
+      67.0,
+      1000
+    ]
+  },
+  "python": "3.13.18"
+}
