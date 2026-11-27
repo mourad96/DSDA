@@ -1,5 +1,8 @@
 # DSDA controlled geospatial testbed on the OpenStreetMap graph (RR27)
 
+The study restricted to the 82 RR27 crashes, with the frozen HRRS screening, follows
+`testbed/PROTOCOL_v1.3.md`; this document covers versions 1.0 to 1.2.
+
 Protocol version 1.2. Version 1.0 was frozen on 23 November 2026, before any
 real OpenStreetMap extract was loaded; version 1.1 (section 0) amends only the
 PK calibration, on the same day, after inspection of the extract and before any
