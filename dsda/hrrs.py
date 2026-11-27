@@ -252,8 +252,16 @@ PK41_WINDOW = WINDOWS.index((41 - PK_MIN, 1))
 
 
 def classify(bins: np.ndarray, oss: np.ndarray, draws: int, seed: int,
-             t_mean: float = T_MEAN_REGISTRY, with_scans: bool = True) -> dict:
-    """Full HRRS screening of one set of crash positions (bins) with their OSS."""
+             t_mean: float = T_MEAN_REGISTRY, with_scans: bool = True,
+             oss_draws: Optional[int] = None, freq_seed: Optional[int] = None) -> dict:
+    """Full HRRS screening of one set of crash positions (bins) with their OSS.
+
+    draws: Monte Carlo draws of the frequency scan (null cached by number of
+    crashes); oss_draws: draws of the two OSS scans (default: draws);
+    freq_seed: seed of the frequency-scan null (default: seed).
+    """
+    oss_draws = draws if oss_draws is None else oss_draws
+    freq_seed = seed if freq_seed is None else freq_seed
     bins, oss = np.asarray(bins), np.asarray(oss, dtype=float)
     keep = bins >= 0
     counts = np.bincount(bins[keep], minlength=len(PKS)).astype(float)
@@ -263,9 +271,9 @@ def classify(bins: np.ndarray, oss: np.ndarray, draws: int, seed: int,
     flagged = {name: [] for name in SEGMENTS}
     if with_scans:
         scans = {
-            "frequency": frequency_scan(counts, draws, seed),
-            "oss_randomisation": oss_randomisation_scan(bins, oss, draws, seed + 1),
-            "oss_permutation": oss_permutation_scan(bins, oss, draws, seed + 2),
+            "frequency": frequency_scan(counts, draws, freq_seed),
+            "oss_randomisation": oss_randomisation_scan(bins, oss, oss_draws, seed + 1),
+            "oss_permutation": oss_permutation_scan(bins, oss, oss_draws, seed + 2),
         }
         for kind, sc in scans.items():
             for w in clusters(sc):

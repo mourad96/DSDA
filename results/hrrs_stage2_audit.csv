@@ -1,0 +1,96 @@
+section,item,statistic,value,detail
+corridor,RR27 PK 27-42,crashes,82,
+corridor,RR27 PK 27-42,fatal crashes,26,
+corridor,RR27 PK 27-42,OSS total,550,
+corridor,RR27 PK 27-42,exposure (1e8 veh-km),9.028,
+corridor,RR27 PK 27-42,T_mean computed (crashes / 1e8 veh-km),9.0828,fixed value used for T_c: 9.08
+macro,HRRS-1,n,11,
+macro,HRRS-1,E,3.5716,
+macro,HRRS-1,T,3.0799,
+macro,HRRS-1,Tc,11.8429,
+macro,HRRS-1,LCB,1.5375,
+macro,HRRS-1,UCB,5.5107,
+macro,HRRS-1,LCB_95 > T_c,False,
+macro,HRRS-1,UCB_95 < T_c,True,
+macro,HRRS-2,n,33,
+macro,HRRS-2,E,1.6605,
+macro,HRRS-2,T,19.8739,
+macro,HRRS-2,Tc,13.2279,
+macro,HRRS-2,LCB,13.6803,
+macro,HRRS-2,UCB,27.9103,
+macro,HRRS-2,LCB_95 > T_c,True,
+macro,HRRS-2,UCB_95 < T_c,False,
+macro,HRRS-3,n,28,
+macro,HRRS-3,E,2.7152,
+macro,HRRS-3,T,10.3125,
+macro,HRRS-3,Tc,12.2724,
+macro,HRRS-3,LCB,6.8526,
+macro,HRRS-3,UCB,14.9044,
+macro,HRRS-3,LCB_95 > T_c,False,
+macro,HRRS-3,UCB_95 < T_c,False,
+macro,HRRS-4,n,10,
+macro,HRRS-4,E,1.0808,
+macro,HRRS-4,T,9.2521,
+macro,HRRS-4,Tc,14.3105,
+macro,HRRS-4,LCB,4.4368,
+macro,HRRS-4,UCB,17.015,
+macro,HRRS-4,LCB_95 > T_c,False,
+macro,HRRS-4,UCB_95 < T_c,False,
+scan_frequency,PK 33-37,statistic,20.2,most likely cluster
+scan_frequency,PK 33-37,p_adj,0.0001,HRRS-2
+scan_frequency,PK 41,statistic,0.8791,secondary cluster 1
+scan_frequency,PK 41,p_adj,0.9479,HRRS-4
+scan_frequency,PK 27,statistic,0.0254,secondary cluster 2
+scan_frequency,PK 27,p_adj,1.0,HRRS-1
+scan_oss_randomisation,PK 33-35,statistic,3.9029,most likely cluster
+scan_oss_randomisation,PK 33-35,p_adj,0.0379,HRRS-2
+scan_oss_randomisation,PK 41,statistic,3.1096,secondary cluster 1
+scan_oss_randomisation,PK 41,p_adj,0.1638,HRRS-4
+scan_oss_randomisation,PK 37,statistic,0.9687,secondary cluster 2
+scan_oss_randomisation,PK 37,p_adj,0.9987,HRRS-3
+scan_oss_randomisation,PK 32,statistic,0.0947,secondary cluster 3
+scan_oss_randomisation,PK 32,p_adj,1.0,HRRS-1
+scan_oss_permutation,PK 32-33,statistic,2.3419,most likely cluster
+scan_oss_permutation,PK 32-33,p_adj,0.4166,"HRRS-1, HRRS-2"
+scan_oss_permutation,PK 41,statistic,2.2343,secondary cluster 1
+scan_oss_permutation,PK 41,p_adj,0.483,HRRS-4
+scan_oss_permutation,PK 39,statistic,0.3229,secondary cluster 2
+scan_oss_permutation,PK 39,p_adj,1.0,HRRS-3
+scan_oss_permutation,PK 42,statistic,0.0472,secondary cluster 3
+scan_oss_permutation,PK 42,p_adj,1.0,HRRS-4
+scan_frequency_fatal,PK 33-37,statistic,5.3108,most likely cluster
+scan_frequency_fatal,PK 33-37,p_adj,0.0218,HRRS-2
+scan_frequency_fatal,PK 41,statistic,2.6467,secondary cluster 1
+scan_frequency_fatal,PK 41,p_adj,0.2693,HRRS-4
+scan_frequency_fatal,PK 32,statistic,0.0512,secondary cluster 2
+scan_frequency_fatal,PK 32,p_adj,1.0,HRRS-1
+vigilance_PK41,PK 41,OSS,107.0,
+vigilance_PK41,PK 41,OSS rank,1,
+vigilance_PK41,PK 41,permutation p_raw,0.0288,
+vigilance_PK41,PK 41,permutation p_adj,0.483,
+classification,HRRS-1,tier,3,
+classification,HRRS-2,tier,1,frequency PK 33-37 (p_adj 0.0001); oss_randomisation PK 33-35 (p_adj 0.0379)
+classification,HRRS-3,tier,2,
+classification,HRRS-4,tier,2,
+holdout_2007-2011,corridor,crashes,56,
+holdout_2007-2011,corridor,OSS,299,
+holdout_2007-2011,top 3 km by frequency,PKs,"PK 34 (11), PK 35 (10), PK 37 (7)",
+holdout_2007-2011,top 3 km by rate,PKs,"PK 34 (35.77), PK 35 (32.52), PK 37 (23.32)",
+holdout_2007-2011,top 3 km by OSS,PKs,"PK 35 (71), PK 41 (54), PK 33 (44)",
+holdout_2007-2011,best 3 km window by frequency,window,PK 34-36,26
+holdout_2007-2011,best 3 km window by OSS,window,PK 33-35,155
+holdout_2007-2011,segment ranking by rate,order,HRRS-2 (27.10) > HRRS-3 (11.93) > HRRS-4 (9.99) > HRRS-1 (3.53),
+holdout_2012-2015,corridor,crashes,26,
+holdout_2012-2015,corridor,OSS,251,
+holdout_2012-2015,top 3 km by frequency,PKs,"PK 37 (5), PK 33 (4), PK 34 (3)",
+holdout_2012-2015,top 3 km by rate,PKs,"PK 37 (20.82), PK 33 (16.26), PK 41 (12.49)",
+holdout_2012-2015,top 3 km by OSS,PKs,"PK 33 (58), PK 41 (53), PK 34 (38)",
+holdout_2012-2015,best 3 km window by frequency,window,PK 35-37,9
+holdout_2012-2015,best 3 km window by OSS,window,PK 32-34,116
+holdout_2012-2015,segment ranking by rate,order,HRRS-2 (10.84) > HRRS-4 (8.33) > HRRS-3 (8.29) > HRRS-1 (2.52),
+holdout_agreement,frequency,Spearman rho (16 km),0.7931,
+holdout_agreement,frequency,top-3 km overlap (of 3),2,
+holdout_agreement,rate,Spearman rho (16 km),0.765,
+holdout_agreement,rate,top-3 km overlap (of 3),1,
+holdout_agreement,OSS,Spearman rho (16 km),0.7936,
+holdout_agreement,OSS,top-3 km overlap (of 3),2,
