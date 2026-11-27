@@ -132,7 +132,7 @@ python scripts/table_f3_poisson_snr.py
 
 ### Controlled testbed on the OpenStreetMap graph (Tables 5, C.1, C.2, D.2)
 
-No surveyed crash positions exist for RR27 or RN15. DSDA is therefore evaluated on a
+No surveyed crash positions exist for RR27. DSDA is therefore evaluated on a
 simulation testbed built on the real OpenStreetMap road graph of RR27, with true positions
 drawn inside each record's recorded PK interval. The protocol (`testbed/PROTOCOL.md`, v1.0)
 was frozen before any real extract was loaded; results are reported whatever they are.
@@ -147,6 +147,25 @@ Outputs: `table5_testbed`, `tableC1_testbed`, `tableC2_testbed`, `tableD2_testbe
 Markdown), `manifest.json` (OSM timestamp, file hashes, seeds, anchors), `qa_report.md`, and the
 input files of scenario S1 replicate 0 with the output of `scripts/run_ablation.py` on them.
 The registry itself is not distributed; only its PK and coded-cause fields are read.
+
+### Protocol v1.3: 82 RR27 crashes, from DSDA to the HRRS screening
+
+`testbed/PROTOCOL_v1.3.md` (written and committed before any simulation) covers the 82
+injury crashes of RR27 PK 27-42 (2007-2015), the frozen HRRS module `dsda/hrrs.py`
+(segments HRRS-1 to HRRS-4, critical rates with exact Poisson bounds, multiplicity-adjusted
+Poisson and severity scans) and four tasks, seed 2026, 1,000 replicates:
+
+```bash
+python scripts/export_rr27_82.py BD_RR27F.xlsx   # data/rr27_82_anonymized.csv (once)
+python scripts/testbed_v13.py           # Task 1: results/ablation_v1_3.csv (+ simulation cache)
+python scripts/sensitivity_sigma_cs.py  # Task 2: results/sensitivity_sigma_cs.csv, post hoc sigma
+python scripts/end_to_end_hrrs.py       # Task 3: results/end_to_end_hrrs.csv
+python scripts/hrrs_stage2_audit.py     # Task 4: results/hrrs_stage2_audit.csv (registry only)
+```
+
+Task 4 needs only `data/rr27_82_anonymized.csv`; Tasks 2 and 3 read the cache written by
+Task 1 (`results/_cache/`, not versioned). Crash positions inside each kilometre are
+simulated: Tasks 1 to 3 measure how DSDA behaves on the real OSM graph, not field accuracy.
 
 ---
 
