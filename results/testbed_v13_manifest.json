@@ -1,0 +1,80 @@
+{
+  "protocol_version": "1.3",
+  "run_utc": "2026-11-27T19:30:46+00:00",
+  "code_commit": "9dd3558bd5859cef015bd7077a75b27a3e936172",
+  "script_sha256": "5efa2a843a04800826b811789136b1feedfbfb4c7125d0f66396ba291ecdfd58",
+  "osm_file": "data/osm/rr27_corridor_2026-11-23.json.gz",
+  "osm_sha256": "93dad12675ebf370b30edb80d5fc82c07c62ceb6d86fe36f94ddb6b305c32182",
+  "osm_timestamp": "2026-11-23T20:02:34Z",
+  "data_sha256": "d3af46b958408c90f8fce392fe3b26a91198488af09affe3a977cca243b29c85",
+  "replicates": 1000,
+  "base_seed": 2026,
+  "scenarios": {
+    "S0": {
+      "p_omit": 0.0,
+      "p_sub": 0.0,
+      "p_typo": 0.0,
+      "p_pk_shift": 0.0,
+      "p_pk_missing": 0.0,
+      "p_gis_gap": 0.0,
+      "p_j_omit": 0.0,
+      "p_j_fp": 0.0
+    },
+    "S1": {
+      "p_omit": 0.15,
+      "p_sub": 0.05,
+      "p_typo": 0.25,
+      "p_pk_shift": 0.05,
+      "p_pk_missing": 0.05,
+      "p_gis_gap": 0.1,
+      "p_j_omit": 0.1,
+      "p_j_fp": 0.05
+    },
+    "S2": {
+      "p_omit": 0.3,
+      "p_sub": 0.1,
+      "p_typo": 0.5,
+      "p_pk_shift": 0.1,
+      "p_pk_missing": 0.1,
+      "p_gis_gap": 0.2,
+      "p_j_omit": 0.2,
+      "p_j_fp": 0.1
+    }
+  },
+  "sigmas": [
+    150.0,
+    250.0,
+    350.0
+  ],
+  "gate": 0.85,
+  "junction_radius_m": 30.0,
+  "plant_primary": {
+    "kind": "junction",
+    "osm": "node/6627481113",
+    "s": 11727.488907241906,
+    "pk": 34.26446435730229,
+    "names": [],
+    "name": null
+  },
+  "plant_secondary": {
+    "kind": "named feature",
+    "osm": "way/208553018",
+    "s": 12405.46,
+    "pk": 34.942,
+    "name": "Emacer.",
+    "offset_m": 332.648
+  },
+  "qa": [
+    "Route ways matched (^(RR|MC|C|RL|R)\\s*-?\\s*27$): 93; centerline length 26.68 km; share of centerline edges on tagged route ways: 93.8%.",
+    "Check anchor PK 36.300 (mazraa): no OSM place of that name.",
+    "Check anchor PK 31.240 (Maâmoura, 1470 m from RR27): unit-scale PK at its projection 28.592 (difference -2.648 km); ratio to origin 2.664 PK-km per OSM-km  << outside QA range.",
+    "Check anchor PK 33.080 (hydraulic structure): nearest OSM structure way/208559838 (waterway stream) at unit-scale PK 33.841 (761 m, beyond the 300 m tolerance).",
+    "Check anchor PK 33.560 (hydraulic structure): nearest OSM structure way/208559838 (waterway stream) at unit-scale PK 33.841 (281 m).",
+    "Calibration (protocol v1.1): PK = 27.000 + (s - 4463.0 m) / 1000.",
+    "Junctions on the centerline: 191 (19 with a named or numbered crossing road).",
+    "Named features within 700 m: 508; indexable (road vertex within 150 m): 505.",
+    "Municipal places (city/town/village): 10."
+  ],
+  "junction_true_share_82": 0.34524390243902436,
+  "no_landmark_share_82": 0.5887439024390244
+}

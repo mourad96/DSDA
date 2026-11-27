@@ -149,6 +149,26 @@ PK 34.94, recorded PK 35; the reports cite its name). Recovery: the 500 m bin co
 first by crash count among the 32 bins (82 + 10 crashes). Compared for policies
 B and C and for the nominal PK (position uniform within the reported kilometre).
 
+Implementation (fixed before the Task 3 run): HRRS screening of replicate r uses
+seed 2026 + 4,000,000 + r for the two OSS scans (2,000 draws each) and the
+cached frequency null of section 5 (10,000 draws, seed 2026); the nominal
+positions of the planted test use seed 2026 + 6,000,000 + 10 r + scenario index
+(S0 = 0, S1 = 1, S2 = 2). Reference 1 is screened with 10,000 draws for all
+scans (seed 2026), as in section 7. Half-kilometre accuracy counts unplaced
+records as wrong for policies B and C (denominator 82) and is computed on the
+accepted records only for policy A. Policy A uses the frozen T_mean = 9.08
+for T_c,s, so the loss of rejected records lowers its macro-scale rates.
+
+Boundary rule for 500 m statistics (added after a 4-replicate smoke test and
+before the 1,000-replicate run): a policy B record placed on the nominal post of
+PK n lies exactly on the boundary between the two halves of kilometre n. It
+counts 0.5 in each half for the planted-hotspot counts and earns 0.5 of the
+half-kilometre accuracy credit when kilometre n is correct. Without this rule
+the floor convention puts every post record in the upper half [n, n + 0.5),
+which in the smoke test produced a spurious 100 % recovery of the primary
+planted hotspot (PK 34.26) by policy B although DSDA accepted none of its
+records.
+
 ## 7. Stage-2 audit on the registry (Task 4)
 
 `scripts/hrrs_stage2_audit.py`: section 5 applied to the 82 registry crashes

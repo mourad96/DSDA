@@ -24,3 +24,6 @@ htmlcov/
 .idea/
 *.swp
 *.swo
+
+# Regenerable simulation cache (scripts/testbed_v13.py)
+results/_cache/

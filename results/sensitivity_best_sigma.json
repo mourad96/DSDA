@@ -1,0 +1,9 @@
+{
+  "rule": "minimum S1 mean positional error of policy B at Cs = 0.85, ties to the smaller sigma (post hoc)",
+  "policyB_mean_error_by_sigma": {
+    "150": 285.92,
+    "250": 277.43,
+    "350": 271.12
+  },
+  "best_sigma_m": 350
+}
