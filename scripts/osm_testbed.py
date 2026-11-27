@@ -156,7 +156,12 @@ def load_osm(path: Path) -> OsmData:
     suffix = "".join(path.suffixes).lower()
     if suffix.endswith(".pbf"):
         return _load_pbf(path)
-    text = path.read_text(encoding="utf-8")
+    if suffix.endswith(".gz"):
+        import gzip
+        with gzip.open(path, "rt", encoding="utf-8") as fh:
+            text = fh.read()
+    else:
+        text = path.read_text(encoding="utf-8")
     if text.lstrip().startswith("{"):
         return _load_json(json.loads(text))
     return _load_xml(ET.fromstring(text))

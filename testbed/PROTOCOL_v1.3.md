@@ -137,9 +137,15 @@ Sub-kilometre resolution: (a) half_km_accuracy, the share of crashes placed in
 the correct 500 m bin (32 bins), for policies B and C and for accepted records,
 against the 50 % of an uninformative position within the correct kilometre;
 (b) planted_hotspot_test: 10 crashes added within +/- 25 m (along the
-centerline) of the named, indexable OSM feature whose projection is nearest to
-PK 34.0 within [33.5, 34.5); recorded PK = nearest integer; same report model
-and degradations. Recovery: the 500 m bin containing the feature ranks strictly
+centerline) of a real OSM element near PK 34; recorded PK = nearest integer;
+same report model and degradations. The OSM extract holds no named feature
+whose projection lies in [33.5, 34.5) (between PK 32.5 and 35.5 there is a
+single named feature, a building 333 m off the road at PK 34.94, and ten
+unnamed junctions). The rule, completed on inspection of the extract and before
+any run, is therefore: primary variant, the junction nearest to PK 34.0
+(unnamed, at PK 34.26; the reports carry the junction flag and no landmark);
+secondary variant, the nearest named indexable feature (the building at
+PK 34.94, recorded PK 35; the reports cite its name). Recovery: the 500 m bin containing the feature ranks strictly
 first by crash count among the 32 bins (82 + 10 crashes). Compared for policies
 B and C and for the nominal PK (position uniform within the reported kilometre).
 
